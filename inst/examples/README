@@ -1,0 +1,8 @@
+
+To test any of these files (assuming you've already loaded Rdsm and set
+up a Snow/parallel cluster), first source() it and then run test().  In
+some cases, there is a second test, test1().
+
+Descriptions of the examples are given in the comments at the heads of
+the files.
+

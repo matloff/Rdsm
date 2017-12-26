@@ -1,0 +1,8 @@
+
+import(parallel,bigmemory)
+
+export(mgrinit,mgrmakevar,mgrmakelock,makebarr,barr,
+   rdsmlock,rdsmunlock,
+   getidxs,getmatrix,stoprdsm,
+   readsync,writesync,loadex)
+ 

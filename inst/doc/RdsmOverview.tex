@@ -1,0 +1,424 @@
+
+\documentclass[11pt]{article}
+
+\setlength{\oddsidemargin}{0in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{0.0in} 
+\setlength{\textwidth}{6.5in}
+\setlength{\textheight}{9.0in}
+\setlength{\parindent}{0in}
+\setlength{\parskip}{0.15in}
+
+\usepackage{times}
+\usepackage{url}
+\usepackage[dvips]{graphicx}
+
+\usepackage{listings}
+
+\begin{document}
+
+\title{Rdsm Overview} 
+
+\author{Norm Matloff}
+
+\date{}
+
+\maketitle
+
+% \tableofcontents
+
+{\bf Rdsm} is a library for doing parallel processing in R.  It uses the
+{\it shared-memory paradigm}, which has two advantages:
+
+\begin{itemize}
+
+\item It generally involves simpler code, which makes it easier to write
+and read.
+
+\item In some cases it can bring a significant advantage in execution
+speed.
+
+\end{itemize}
+
+While it runs best on multicore machines, it can also run on a
+collection of computers that share a common file system.  
+
+{\bf Rdsm}'s infrastructure is built on the {\bf bigmemory} and {\bf
+synchronicity} libraries for access to shared memory (or common files),
+and uses the {\bf snow} library (actually part of R's {\bf parallel}
+library) for launching threads.
+
+This document will introduce {\bf Rdsm}.
+
+\section{Clarity and Conciseness of Shared-Memory Programming}
+\label{clarity}
+
+On a multicore machine, the standard method for parallel programming is
+to have a program run in multiple instantiations called {\it threads},
+which run in parallel, one per core.  The key point is that all the
+threads hold the program's global variables in common, the {\it
+shared-memory programming paradigm}, or {\it threaded programming}.
+{\bf Rdsm} brings this paradigm to R.
+
+The shared-memory programming world view is considered by many in the
+parallel processing community to be one of the clearest forms of
+parallel programming.\footnote{See Chandra, Rohit (2001), \textit{Parallel 
+Programming in OpenMP}, Kaufmann, pp.10ff (especially Table 1.1), and
+Hess, Matthias \textit{et al} (2003), Experiences Using OpenMP Based on
+Compiler Directive Software DSM on a PC Cluster, in \textit{OpenMP Shared
+Memory Parallel Programming: International Workshop on OpenMP
+Applications and Tools}, Michael Voss (ed.), Springer, p.216.}
+Let's see why.
+
+Suppose for instance we wish to copy \textbf{x} to \textbf{y}.  In a
+message-passing setting such as \textbf{Rmpi}, \textbf{x} and \textbf{y}
+may reside in processes 2 and 5, say.  The programmer might write code
+like
+
+\begin{lstlisting}
+mpi.send.Robj(x,tag=0,dest=5)
+\end{lstlisting}
+
+to run on process 2, and write code
+
+\begin{lstlisting}
+y <- mpi.recv.Robj(tag=0,source=2)
+\end{lstlisting}
+
+to run on process 5.  By contrast, in a shared-memory environment, the
+variables {\bf x} and {\bf y} would be shared, and the programmer would
+merely write for process 5
+
+\begin{lstlisting}
+y <- x
+\end{lstlisting}
+
+What a difference!  Now that  {\bf x} and {\bf y} are shared by the
+processes, we can access them directly, making our code vastly simpler.
+
+Note carefully that we are talking about human efficiency here, not
+machine efficiency.  Use of shared memory can greatly simplify our code,
+with far less clutter, so that we can write and debug our program much
+faster than we could in a message-passing environment.  But that doesn't
+mean our program itself has faster execution speed.  However, as shown
+later in this document, {\bf Rdsm} can indeed bring a significant
+performance advantage in some applications.
+
+\section{Example:  Matrix Multiplication}
+\label{matmul}
+
+The standard ``Hello World'' example of the parallel processing
+community is matrix multiplication.  Here is code from the {\bf Rdsm}
+distribution {\bf examples/} directory:
+
+\subsection{The Code}
+
+\begin{lstlisting}[numbers=left]
+# matrix multiplication; the product u %*% v is computed, and
+# stored in w
+
+# each thread executes this
+mmul <- function(u,v,w) {
+   require(parallel)
+   # determine which rows of u this thread will handle
+   myidxs <- splitIndices(nrow(u),myinfo$nwrkrs)[[myinfo$id]]
+   # multiply v by this thread's rows in u
+   w[myidxs,] <- u[myidxs,] %*% v[,]
+   # done
+   invisible(0)  # don't do expensive return of result
+}
+
+test <- function(cls) {
+   # set up
+   require(parallel)
+   # initialize Rdsm
+   mgrinit(cls)
+   # create the shared variables, and given them values
+   mgrmakevar(cls,"a",6,2)
+   mgrmakevar(cls,"b",2,6)
+   mgrmakevar(cls,"c",6,6)
+   a[,] <- 1:12
+   b[,] <- rep(1,12)
+   # give the code to the threads
+   clusterExport(cls,"mmul")
+   # here is the actual program execution
+   clusterEvalQ(cls,mmul(a,b,c))
+   print(c[,])
+}
+\end{lstlisting}
+
+Here is a test run:
+
+\begin{lstlisting}
+> library(Rdsm)
+> c2 <- shmcls(2)
+> source("~/R/Rdsm/examples/MMul.R")
+> test(c2)
+     [,1] [,2] [,3] [,4] [,5] [,6]
+[1,]    8    8    8    8    8    8
+[2,]   10   10   10   10   10   10
+[3,]   12   12   12   12   12   12
+[4,]   14   14   14   14   14   14
+[5,]   16   16   16   16   16   16
+[6,]   18   18   18   18   18   18
+\end{lstlisting}
+
+Here we first set up a two-node {\bf snow} cluster {\bf c2}, by calling
+an {\bf Rdsm} convenience function {\bf shmcls()}.  The code {\bf
+test()} is run on the manager node, meaning the one from which we set
+up the cluster.
+
+First, {\bf Rdsm}'s {\bf mgrinit()} is called to initialize the {\bf
+Rdsm} system, after which we set up three matrices in shared memory,
+{\bf a}, {\bf b} and {\bf c}.  This action will distribute the necessary
+{\bf bigmemory} keys to the {\bf snow} worker nodes.
+
+{\bf Snow}'s {\bf clusterEvalQ()} is used to launch the threads.
+Suppose here and below that we are on a quadcore machine running four
+{\bf Rdsm} threads.  Then {\bf mmul()} will run on all four
+threads/cores at once (though it probably won't be the case that all
+threads are running the same line of code simultaneously).  
+
+Now, how does {\bf mmul()} work?  The basic idea is break the rows of
+the argument matrix {\bf u} into chunks, and have each thread work on
+one chunk.  Say there are 1000 rows, and we have a quadcore machine (on
+which we've set up a four-node {\bf snow} cluster).  Thread 1 would
+handle rows 1-250, thread 2 would work on rows 251-500 and so on.  The
+chunks are assigned in the code
+
+\begin{lstlisting}
+myidxs <- splitIndices(nrow(u),myinfo$nwrkrs)[[myinfo$id]]
+\end{lstlisting}
+
+calling the {\bf snow} function {\bf splitIndices()}.  For example, the
+value of {\bf myidxs} at thread 2 will be 251:500.  The built-in {\bf Rdsm}
+variable {\bf myinfo} is an R list containing {\bf nwrkrs}, the total
+number of threads, and {\bf id}, the ID number of this thread.  On thread
+2 in our example here, those numbers will be 4 and 2, respectively.
+
+The reader should note the ``me, my'' point of view that is key to
+threads programming.  Remember, each of the threads is (more or less)
+simultaneously executing {\bf mmmul()}.  So, the code in that function
+must be written from the point of view of a particular thread.  That's
+why we put the ``my'' in the variable name {\bf myidxs}.  We're writing
+the code from the anthropomorphic view of imagining the code being
+executed by a particular thread.  That thread is ``me,'' and so the row
+indices are ``my'' indices, hence the name {\bf myidxs}.
+
+Each thread multiplies {\bf v} by the thread's own chunk of {\bf u},
+placing the result in the corresponding chunk of {\bf w}:
+
+\begin{lstlisting}
+w[myidxs,] <- u[myidxs,] %*% v[,]
+\end{lstlisting}
+
+This last line of code is like our \lstinline{y <- x} back in Section
+\ref{clarity}.  Unlike a message-passing approach, we had no shipping of
+objects back and forth among threads; the objects are ``already there,''
+and we access them simply and directly.  
+
+In this small example, the simplicity of shared-memory programming
+occurs only in this one line of code.  But in a complex program, the
+increase in simplicity, readability and so on would be quite
+substantial.
+
+Incidentally, the shared-memory nature of our code is also reflected in
+the fact that our result, the matrix {\bf w}, is not returned to the
+caller.  Instead, it is simply available as a shared variable to all
+parties who hold the {\bf bigmemory} key for that variable.
+
+Indeed, we can access that variable ({\bf c}, the actual argument
+corresponding to {\bf w} after our call to {\bf mmul()}) back at the 
+manager:
+
+\begin{lstlisting}
+> c[,]
+     [,1] [,2] [,3] [,4] [,5] [,6]
+[1,]    8    8    8    8    8    8
+[2,]   10   10   10   10   10   10
+[3,]   12   12   12   12   12   12
+[4,]   14   14   14   14   14   14
+[5,]   16   16   16   16   16   16
+[6,]   18   18   18   18   18   18
+\end{lstlisting}
+
+In fact, {\bf Rdsm} includes utilities {\bf saveshvar()} and {\bf
+loadshvar()} for saving a key to a file and then loading it from another
+invocation of R on the same machine.  The latter will then be able to
+access the shared variable as well.
+
+\subsection{Speedup over Serial Code}
+
+We won't do extensive timing experiments here, but let's just check that
+the code is indeed providing a speedup:
+
+\begin{lstlisting}
+> n <- 5000
+> m <- matrix(runif(n^2),ncol=n); system.time(m %*% m)
+   user  system elapsed
+345.077   0.220 346.356
+> cls <- shmcls(4)
+> mgrinit(cls)
+> mgrmakevar(cls,"msh",n,n)
+> mgrmakevar(cls,"msh2",n,n)
+> msh[,] <- m
+> clusterExport(cls,"mmul")
+> system.time(clusterEvalQ(cls,mmul(msh,msh,msh2)))
+   user  system elapsed
+  0.004   0.000  91.863
+\end{lstlisting}
+
+So, a fourfold increase in the number of cores yielded almost a
+fourfold increase in speed, very good.  Of course, this is a classic
+embarrassingly parallel application, so we should expect good speedup,
+but it's good to confirm it.  
+
+Moreover, we'll later next that {\bf Rdsm} is much faster on this
+particular application than is another R parallel processing library.
+
+\subsection{A Possible Performance Advantage for Rdsm}
+\label{adshared}
+
+In Section \ref{clarity}, we had a small example comparing the
+shared-memory and message-passing paradigms.  Shared-memory was much
+clearer and more concise, great for ``human efficiency.''
+
+But don't let the fact that our shared-memory code had no send/receive
+operations deceive you into thinking the code necessarily also has
+faster execution.  True, send/receive ops can be slow, especially if
+they involve voluminous copying (say if {\bf x} is a large matrix).
+However, the innocuous-looking operation \lstinline{y <- x} may involve
+hidden copying too, due to {\it cache coherency} actions, and thus is
+not necessarily a ``win.''
+
+In this particular application, though, shared-memory does indeed 
+give us a major performance advantage.  Here is a version of {\bf
+mmul()} using the {\bf multicore} library (also part of the {\bf
+parallel} library):
+
+\begin{lstlisting}
+# mc.cores is the number of cores to use in computation
+mmul1 <- function(u,v,mc.cores) {
+   require(parallel)
+   idxs <- splitIndices(nrow(u),mc.cores)
+   res <- mclapply(idxs,function(idxchunk) u[idxchunk,] %*% v)
+   Reduce(rbind,res)
+}
+\end{lstlisting}
+
+It turns out to be considerably slower than the {\bf Rdsm}
+implementation:
+
+\begin{lstlisting}
+> system.time(mmul1(m,m,4))
+   user  system elapsed
+186.555   1.264 188.886
+\end{lstlisting}
+
+This is about double the run time achieved by {\bf Rdsm}.  
+
+The culprit is the line 
+
+\begin{lstlisting}
+Reduce(rbind,res)
+\end{lstlisting}
+
+in the {\bf multicore} version, which involves a lot of copying of data,
+greatly sapping speed.  This is in stark contrast to the {\bf Rdsm}
+case, in which the threads directly wrote their chunked-multiplication
+results to the desired output matrix.
+
+The shared-memory vs. message-passing debate is a long-running one in
+the parallel processing community.  It has been traditional to argue
+that the shared-memory paradigm doesn't scale well to large systems, but
+the advent of modern multicore systems, especially GPUs, has done much
+to counter that argument.
+
+\section{Barriers and Locks}
+
+Two major tools in shared-memory programming are {\it barriers} and {\it
+locks}, which in {\bf Rdsm} involve the functions {\bf barr()}, {\bf
+lock()} and {\bf unlock()}:\footnote{The latter two come from the {\bf
+synchronicity} library.}
+
+\begin{itemize}
+
+\item When a thread calls {\bf barr()}, the thread will {\it block},
+i.e. not return to the caller, until {\it all} of the threads have made
+this call.
+
+\item When a thread makes the call {\bf lock(l)}, for some lock variable
+{\bf l}, the result will depend on whether {\bf l} is currently locked
+or unlocked:
+
+   \begin{itemize}
+
+   \item If {\bf l} is locked, the calling thread will be blocked until
+   {\bf l} becomes unlocked, at which time the call will return and the
+   thread will proceed,\footnote{If several threads had been waiting at
+   the time of the call, only one will unblock, and the rest will
+   continue waiting.} and the lock will be relocked.
+
+   \item If {\bf l} is unlocked, the calling thread will return
+   immediately, and the lock will be relocked.
+
+   \end{itemize}
+
+\end{itemize}
+
+Why are these constructs central to shared-memory programming?  Again,
+some code from the {\bf examples/} directory will illustrate the ideas.
+
+In the file {\bf BSort.R}, for instance, we are doing {\it bucket sort
+with sampling}.  The details of how this sort works are not important
+here (see the comments in the code), but the point is that we must first
+draw a random sample from the given array.  We have thread 1 do this,
+placing the sample in the shared variable {\bf samp}, while the others
+wait:
+
+\begin{lstlisting}
+if (me == 1) {  # sample to get quantiles
+   samp[1,] <- sort(tmpx[sample(1:length(tmpx),nsamp,replace=F)])
+}
+barr()
+\end{lstlisting}
+
+The action described in the phrase ``while the others wait'' is
+implemented in the call to {\bf barr()}.  Remember, the threads are
+running simultaneously, and we must ensure that no thread attempts to
+access {\bf samp} before it is ready; the barrier achieves that goal for
+us.
+
+To see why/how locks are used, consider the file {\bf KMeans.R}.  This
+is a famous clustering method, but again the details are not important
+here.  What is important is that there is a shared matrix {\bf sums}, to
+which all the threads are adding numbers.  Here is the relevant excerpt
+of the code:
+
+\begin{lstlisting}
+lock(lck)
+# the j values in tmp will be strings, so convert
+for (j in as.integer(names(tmp))) {
+   sums[j,] <- sums[j,] + tmp[[j]]
+}
+unlock(lck)
+\end{lstlisting}
+
+The {\bf for} loop here is known as a {\it critical section}, meaning
+that we need to ensure that only one thread is executing in that section
+of code at a time.  Without that restriction, chaos could result.  Say
+for example two threads want to add 3 and 8 to a certain total,
+respectively, and that the current total is 29.  What could happen is
+that they both see the 29, and compute 32 and 37, respectively, and then
+write those numbers back to the shared total.  The result might be that
+the new total is either 32 or 37, when it actually should be 40.  The
+locks prevent such a calamity.
+
+A refinement would be to set up k locks, one for each row of {\bf sums}.
+Locks sap performance, by temporarily serializing the execution of the
+threads.  Having k locks instead of one might ameliorate the problem
+here.
+
+\end{document}
+
+

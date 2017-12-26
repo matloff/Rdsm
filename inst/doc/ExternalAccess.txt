@@ -1,0 +1,25 @@
+
+Rdsm shared variables can be readable/writable from other concurrently
+running R processes, following this example:
+
+# say have shared variable x in an Rdsm run, invovked from a directory
+# ~/u
+
+# at the manager, do
+
+desc <- bigmemory::describe(x)
+save(desc,file="x")  
+
+
+# at the other R process, do
+
+load("~/u/x")
+tmp <- bigmemory::attach.big.matrix(desc)
+assign("x",tmp)
+
+# x is now accessible, so that e.g. can do
+
+x[2,5] <- 8
+
+# and x[2,5] will change to 8 in the Rdsm run
+
