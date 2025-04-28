@@ -1,8 +1,8 @@
 Package: Rdsm
-Version: 2.1.1
+Version: 3.0.0
 Author: Norm Matloff <normmatloff@gmail.com>
 Maintainer: Norm Matloff <normmatloff@gmail.com>
-Date: 10/01/2014
+Date: 04/29/2025
 Title: Threads Environment for R
 Description: Provides a threads-type programming environment for R.
    The package gives the R programmer the clearer, more concise
@@ -10,11 +10,7 @@ Description: Provides a threads-type programming environment for R.
    performance as well.  In addition, it enables parallel processing on
    very large, out-of-core matrices.  
 OS_type: unix
-Imports: bigmemory (>= 4.0.0), parallel
-Suggests: synchronicity
+Imports: bigmemory (>= 4.0.0), parallel,synchronicity
+Suggests: 
 LazyLoad: no
 License: GPL (>= 2)
-Repository: CRAN
-Packaged: 2014-10-07 04:03:20 UTC; matloff
-NeedsCompilation: no
-Date/Publication: 2014-10-08 05:51:02
