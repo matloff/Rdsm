@@ -5,10 +5,12 @@
 
 rdsmSetup <- function(
    nThreads,  # number of threads
+   IamThread = TRUE,
+   nJoined = as.numeric(IamThread),
    codeSource = '~/mycode.R',
    codeCall,  # best in the form of do.call()
    sharedVars,  # see above
-   mutexNames = 'mutex0',  # must have at least this
+   mutexNames = NULL,  # other than 'mutex0'
    barriers,
    infoDir = '~/',
    infoFile = pastep(infoDir,'rdsmInfo.RData')
@@ -34,7 +36,11 @@ rdsmSetup <- function(
       info$sharedVarDescFiles <- c(info$sharedVarDescFiles,descFile)
    }
 
-   # set up the mutexes
+   # set up the mutexes, first the required one
+   mtx0 <- boost.mutex('mtx0')
+   desc <- describe(mtx0)
+   dput(desc,file=descFile)
+
    for (i in 1:length(info$mutexNames)) {
       mtxname <- info$mutexNames[i]
       tmp <- boost.mutex(mtxname)
@@ -43,14 +49,19 @@ rdsmSetup <- function(
       dput(desc,file=descFile)
       info$mutexNames <- c(info$mutexNames,descFile)
 
-
    }
 
    save(info,infoFile)
 
 }
 
-rsdmJoin <- function() 
+rsdmJoin <- function(infoDir= '~') 
 {
+
+   # check in and get my ID
+   infoFile = pastep(infoDir,'rdsmInfo.RData')
+   load(infoFile)
+
+
 
 }
