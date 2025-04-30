@@ -97,7 +97,7 @@ rdsmMakeSharedVar <- function(varName,nr,nc,infoDir)
    desc <- describe(tmp)
    descFile <- paste0(infoDir,varName,'.desc')
    dput(desc,file=descFile)
-   assign(varName,tmp,envir = parent.frame(2))
+   assign(varName,tmp,envir = .GlobalEnv)
 }
 
 # create a mutex shareable across threads
@@ -107,20 +107,20 @@ rdsmMakeSharedMutex <- function(mutexName,infoDir)
    desc <- describe(tmp)
    descFile <- paste0(infoDir,mutexName,'.desc')
    dput(desc,file=descFile)
-   assign(mutexName,tmp,envir = parent.frame(2))
+   assign(mutexName,tmp,envir = .GlobalEnv)
 }
 
 rdsmAttachSharedVar <- function(varName,infoDir) 
 {
    descFile <- paste0(infoDir,varName,'.desc')
    desc <- dget(descFile)
-   assign(varName,attach.big.matrix(desc),envir = parent.frame(2))
+   assign(varName,attach.big.matrix(desc),envir = .GlobalEnv)
 }
 
 rdsmAttachSharedMutex <- function(mutexName,infoDir) 
 {
    descFile <- paste0(infoDir,mutexName,'.desc')
    desc <- dget(descFile)
-   assign(mutexName,attach.mutex(desc),envir = parent.frame(2))
+   assign(mutexName,attach.mutex(desc),envir = .GlobalEnv)
 }
 
