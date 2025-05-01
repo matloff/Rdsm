@@ -3,6 +3,13 @@
 setup <- function() 
 {
    rdsmMakeSharedVar('nextRowNum',1,1,info$infoDir)
+   rdsmMakeSharedVar('m',10,100000000,info$infoDir)
+   tmp <- c(30000000,70000000)
+   nvals <- sample(tmp,10,replace=TRUE)
+   for (i in 1:10) {
+      n <- nvals[i]
+      m[i,] <- c(n,runif(n))
+   }
 }
 
 doSorts <- function() 

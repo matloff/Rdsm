@@ -31,6 +31,7 @@ rdsmSetup <- function(
    rdsmMakeSharedMutex('mutex0',infoDir)
    rdsmMakeSharedVar('nJoined',1,1,infoDir)
    nJoined[1,1] <- as.numeric(IamThread)
+   if (IamThread) info$myID <- 1
 
    # set up the shared variables
    for (i in 1:length(sharedVars)) {
