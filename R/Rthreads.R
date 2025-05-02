@@ -12,9 +12,7 @@ rthreadsSetup <- function(
    codeCall,  # best in the form of do.call()
    sharedVars,  # see above
    mutexNames = NULL,  # other than 'mutex0'
-   barriers,
-   infoDir = '~/',
-   infoFile = paste0(infoDir,'rthreadsInfo.RData')
+   infoDir = '~/'
 ) 
 {
 
@@ -26,6 +24,8 @@ rthreadsSetup <- function(
       sharedVarNames = NULL,
       mutexNames = mutexNames
    )
+
+   infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
    # setup mutex0 and nJoined
    rthreadsMakeSharedMutex('mutex0',infoDir)

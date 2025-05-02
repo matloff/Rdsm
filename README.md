@@ -1,6 +1,6 @@
 # Rthreads
 
-*Threads for R*  
+*Threads for R!*  
 
 * Physical shared RAM.
 
@@ -28,23 +28,27 @@ How it works:
     of **rthreadsJoin**.
 
 * One runs **rthreadsSetup** in the first window, then **rthreadsJoin**
-  in each of the others.
+  in each window.
 
 * Now call your application function code in each window.
 
 Functions:
 
-* **rthreadsSetup**
+* **rthreadsSetup(nThreads,IamThread,codeSource,codeCall,
+  sharedVars,mutexNames,infoDir**
 
   Set up central information structure. Create shared variables and mutexes.
+  Specify where the application code is, and how to call it.
 
-* **rthreadsJoin**
+* **rthreadsJoin(infoDir)**
 
   Attach the shared variables and mutexes. Acquire an ID for this thread.
   Wait for the other threads to join.
 
-* **rthreadsMakeSharedVar**, **rthreadsMakeSharedMutex**,
-  **rthreadsAttachSharedVar**, **rthreadsAttachSharedMutex** 
+* **rthreadsMakeSharedVar(varName,nr,nc,infoDir)**, 
+  **rthreadsMakeSharedMutex(mutexName,infoDir)**,
+  **rthreadsAttachSharedVari(varName,infoDir)**, 
+  **rthreadsAttachSharedMutexi(mutexName,infoDir)** 
 
   As their names imply.
 
