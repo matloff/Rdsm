@@ -1,30 +1,32 @@
 
+# threads configuration: run
+# rthreadsSetup(nThreads=2,
+#    sharedVars=list(nextRowNum=c(1,1),m=c(10,100000000)))
 
-setup <- function() 
+setup <- function()  # run in "manager thread"
 {
-   rthreadsMakeSharedVar('nextRowNum',1,1,info$infoDir)
-   rthreadsMakeSharedVar('m',10,100000000,info$infoDir)
+   # generate vectors to be sorted, of different sizes
    tmp <- c(30000000,70000000)
-   nvals <- sample(tmp,10,replace=TRUE)
+   nvals <- sample(tmp,10,replace=TRUE)  # 10 vectors to sort
    for (i in 1:10) {
       n <- nvals[i]
-      m[i,] <- c(n,runif(n))
+      m[i,1:(n+1)] <- c(n,runif(n))
    }
 }
 
-doSorts <- function() 
+doSorts <- function()  # run in all threads
 {
 
-   rowNum <- info$myID
-   nextRowNum[1,1] <- info$nThreads + 1
-   while (rowNum <= nrow(m) {
+   rowNum <- info$myID  # my first vector to sort
+
+   while (rowNum <= nrow(m)) {
       n <- m[rowNum,1]
       x <- m[rowNum,2:(n+1)]
       m[rowNum,2:(n+1)] <- sort(x)
-      lock('mutex0')
+      lock(mutex0)
       rowNum <- nextRowNum[1,1]
-      nextRowNum[1,1] <- rowNum + 
-      unlock('mutex0')
+      nextRowNum[1,1] <- rowNum + 1
+      unlock(mutex0)
    }
 
 }
