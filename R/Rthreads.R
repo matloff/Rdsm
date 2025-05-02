@@ -64,12 +64,14 @@ rthreadsJoin <- function(infoDir= '~')
    infoDir <- info$infoDir
    rthreadsAttachSharedVar('nJoined',infoDir)
    rthreadsAttachSharedMutex('mutex0',infoDir)
-   lock(mutex0)
-   oldnj <- nJoined[1,1]
-   nj <- oldnj + 1
-   nJoined[1,1] <- nj
-   info$myID <- nj
-   unlock(mutex0)
+   if (is.null(info$myID)) {
+      lock(mutex0)
+      oldnj <- nJoined[1,1]
+      nj <- oldnj + 1
+      nJoined[1,1] <- nj
+      info$myID <- nj
+      unlock(mutex0)
+   }
    # pick up the shared variables
    sharedVarNames <- info$sharedVarNames
    for (i in 1:length(sharedVarNames)) {
