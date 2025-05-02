@@ -1,5 +1,5 @@
-Package: Rdsm
-Version: 3.0.0
+Package: Rthreads
+Version: 1.0.0
 Author: Norm Matloff <normmatloff@gmail.com>
 Maintainer: Norm Matloff <normmatloff@gmail.com>
 Date: 04/29/2025

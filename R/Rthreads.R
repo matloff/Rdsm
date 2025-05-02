@@ -5,7 +5,7 @@ require(synchronicity)
 # note on sharedVars: excludes mutexes but includes barriers;
 # example value is list(a=c(5,2),b=(2,6))
 
-rdsmSetup <- function(
+rthreadsSetup <- function(
    nThreads,  # number of threads
    IamThread = TRUE,
    codeSource = '~/mycode.R',
@@ -14,7 +14,7 @@ rdsmSetup <- function(
    mutexNames = NULL,  # other than 'mutex0'
    barriers,
    infoDir = '~/',
-   infoFile = paste0(infoDir,'rdsmInfo.RData')
+   infoFile = paste0(infoDir,'rthreadsInfo.RData')
 ) 
 {
 
@@ -28,8 +28,8 @@ rdsmSetup <- function(
    )
 
    # setup mutex0 and nJoined
-   rdsmMakeSharedMutex('mutex0',infoDir)
-   rdsmMakeSharedVar('nJoined',1,1,infoDir)
+   rthreadsMakeSharedMutex('mutex0',infoDir)
+   rthreadsMakeSharedVar('nJoined',1,1,infoDir)
    nJoined[1,1] <- as.numeric(IamThread)
    if (IamThread) info$myID <- 1
 
@@ -37,7 +37,7 @@ rdsmSetup <- function(
    for (i in 1:length(sharedVars)) {
       varName <- names(sharedVars)[i]
       nrowcol <- sharedVars[[i]]
-      rdsmMakeSharedVar(varName,nrowcol[1],nrowcol[2],infoDir)
+      rthreadsMakeSharedVar(varName,nrowcol[1],nrowcol[2],infoDir)
       info$sharedVarNames <- c(info$sharedVarNames,varName)
    }
 
@@ -58,16 +58,16 @@ rdsmSetup <- function(
 
 }
 
-rdsmJoin <- function(infoDir= '~') 
+rthreadsJoin <- function(infoDir= '~') 
 {
 
    # check in and get my ID
-   infoFile = paste0(infoDir,'/rdsmInfo.RData')
+   infoFile = paste0(infoDir,'/rthreadsInfo.RData')
    load(infoFile)
    info <<- info; rm(info)
    infoDir <- info$infoDir
-   rdsmAttachSharedVar('nJoined',infoDir)
-   rdsmAttachSharedMutex('mutex0',infoDir)
+   rthreadsAttachSharedVar('nJoined',infoDir)
+   rthreadsAttachSharedMutex('mutex0',infoDir)
    lock(mutex0)
    oldnj <- nJoined[1,1]
    nj <- oldnj + 1
@@ -77,13 +77,13 @@ rdsmJoin <- function(infoDir= '~')
    # pick up the shared variables
    sharedVarNames <- info$sharedVarNames
    for (i in 1:length(sharedVarNames)) {
-      rdsmAttachSharedVar(sharedVarNames[i],infoDir)
+      rthreadsAttachSharedVar(sharedVarNames[i],infoDir)
    }
    # pick up the application-specific mutexes
    mutexNames <- info$mutexNames
    if (!is.null(mutexNames)) {
       for (i in 1:length(mutexNames)) 
-         rdsmAttachSharedMutex(mutexNames[i],infoDir)
+         rthreadsAttachSharedMutex(mutexNames[i],infoDir)
    }
 
    # wait for everyone else
@@ -92,7 +92,7 @@ rdsmJoin <- function(infoDir= '~')
 }
 
 # create a variable shareable across threads
-rdsmMakeSharedVar <- function(varName,nr,nc,infoDir) 
+rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir) 
 {
    tmp <- big.matrix(nr,nc,type='double')
    desc <- describe(tmp)
@@ -102,7 +102,7 @@ rdsmMakeSharedVar <- function(varName,nr,nc,infoDir)
 }
 
 # create a mutex shareable across threads
-rdsmMakeSharedMutex <- function(mutexName,infoDir) 
+rthreadsMakeSharedMutex <- function(mutexName,infoDir) 
 {
    tmp <- boost.mutex()
    desc <- describe(tmp)
@@ -111,14 +111,14 @@ rdsmMakeSharedMutex <- function(mutexName,infoDir)
    assign(mutexName,tmp,envir = .GlobalEnv)
 }
 
-rdsmAttachSharedVar <- function(varName,infoDir) 
+rthreadsAttachSharedVar <- function(varName,infoDir) 
 {
    descFile <- paste0(infoDir,varName,'.desc')
    desc <- dget(descFile)
    assign(varName,attach.big.matrix(desc),envir = .GlobalEnv)
 }
 
-rdsmAttachSharedMutex <- function(mutexName,infoDir) 
+rthreadsAttachSharedMutex <- function(mutexName,infoDir) 
 {
    descFile <- paste0(infoDir,mutexName,'.desc')
    desc <- dget(descFile)
