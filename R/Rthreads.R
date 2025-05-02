@@ -99,7 +99,7 @@ rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir)
 }
 
 # create a mutex shareable across threads
-rthreadsMakeSharedMutex <- function(mutexName,infoDir) 
+rthreadsMakeMutex <- function(mutexName,infoDir) 
 {
    tmp <- boost.mutex()
    desc <- describe(tmp)
