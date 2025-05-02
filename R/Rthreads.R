@@ -8,8 +8,6 @@ require(synchronicity)
 rthreadsSetup <- function(
    nThreads,  # number of threads
    IamThread = TRUE,
-   codeSource = '~/mycode.R',
-   codeCall,  # best in the form of do.call()
    sharedVars,  # see above
    mutexNames = NULL,  # other than 'mutex0'
    infoDir = '~/'
@@ -19,8 +17,6 @@ rthreadsSetup <- function(
    info <<- list(
       nThreads = nThreads,
       infoDir <- infoDir,
-      codeSource = codeSource,
-      codeCall = codeCall,
       sharedVarNames = NULL,
       mutexNames = mutexNames
    )

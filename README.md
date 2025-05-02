@@ -10,6 +10,19 @@
 
 * Formerly the **Rdsm** package, but fully rewritten.
 
+# Advantages of Shared-Memory Approach
+
+* Alternative is message-passing, e.g. **parallel** package,
+  including via **foreach** interface.
+
+* Faster execution, since there is no expensive repeated passing
+  of data from one process to another.
+
+* Threads manage their own task assignment, rather via communication
+  from a central process.
+
+* Clearer code.
+
 How it works:
 
 * The shared memory is implemented via the **bigmemory** package.
@@ -34,13 +47,11 @@ How it works:
 
 * Now call your application function code in each window.
 
-Functions:
+# Functions
 
-* **rthreadsSetup(nThreads,IamThread,codeSource,codeCall,
-  sharedVars,mutexNames,infoDir**
+* **rthreadsSetup(nThreads,IamThread,sharedVars,mutexNames,infoDir**
 
   Set up central information structure. Create shared variables and mutexes.
-  Specify where the application code is, and how to call it.
 
 * **rthreadsJoin(infoDir)**
 
@@ -53,4 +64,10 @@ Functions:
   **rthreadsAttachSharedMutexi(mutexName,infoDir)** 
 
   As their names imply.
+
+# Example
+
+* Have a number of vectors, each to be sorted.
+
+
 
