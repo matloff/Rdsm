@@ -8,6 +8,8 @@
 
 * Each thread is a separate instance of R.
 
+* Formerly the **Rdsm** package, but fully rewritten.
+
 How it works:
 
 * The shared memory is implemented via the **bigmemory** package.
@@ -27,8 +29,8 @@ How it works:
   * Future editions will automate the window creation and run
     of **rthreadsJoin**.
 
-* One runs **rthreadsSetup** in the first window, then **rthreadsJoin**
-  in each window.
+* Run **rthreadsSetup** in the first window (the "manager
+  thread"), then run **rthreadsJoin** in each window.
 
 * Now call your application function code in each window.
 
