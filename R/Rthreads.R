@@ -7,7 +7,6 @@ require(synchronicity)
 
 rthreadsSetup <- function(
    nThreads,  # number of threads
-   IamThread = TRUE,
    sharedVars,  # see above
    mutexNames = NULL,  # other than 'mutex0'
    infoDir = '~/'
@@ -16,7 +15,7 @@ rthreadsSetup <- function(
 
    info <<- list(
       nThreads = nThreads,
-      infoDir <- infoDir,
+      infoDir = infoDir,
       sharedVarNames = NULL,
       mutexNames = mutexNames
    )
@@ -24,10 +23,9 @@ rthreadsSetup <- function(
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
    # setup mutex0 and nJoined
-   rthreadsMakeSharedMutex('mutex0',infoDir)
+   rthreadsMakeMutex('mutex0',infoDir)
    rthreadsMakeSharedVar('nJoined',1,1,infoDir)
-   nJoined[1,1] <- as.numeric(IamThread)
-   if (IamThread) info$myID <- 1
+   nJoined[1,1] <- 1 
 
    # set up the shared variables
    for (i in 1:length(sharedVars)) {
@@ -51,10 +49,11 @@ rthreadsSetup <- function(
    }
 
    save(info,file=infoFile)
+   info$myID <- 1
 
 }
 
-rthreadsJoin <- function(infoDir= '~') 
+rthreadsJoin <- function(infoDir= '~',mgrThread) 
 {
 
    # check in and get my ID
@@ -62,9 +61,9 @@ rthreadsJoin <- function(infoDir= '~')
    load(infoFile)
    info <<- info; rm(info)
    infoDir <- info$infoDir
-   rthreadsAttachSharedVar('nJoined',infoDir)
-   rthreadsAttachSharedMutex('mutex0',infoDir)
-   if (is.null(info$myID)) {
+   if (!mgrThread) {
+      rthreadsAttachSharedVar('nJoined',infoDir)
+      rthreadsAttachMutex('mutex0',infoDir)
       lock(mutex0)
       oldnj <- nJoined[1,1]
       nj <- oldnj + 1
@@ -116,7 +115,7 @@ rthreadsAttachSharedVar <- function(varName,infoDir)
    assign(varName,attach.big.matrix(desc),envir = .GlobalEnv)
 }
 
-rthreadsAttachSharedMutex <- function(mutexName,infoDir) 
+rthreadsAttachMutex <- function(mutexName,infoDir) 
 {
    descFile <- paste0(infoDir,mutexName,'.desc')
    desc <- dget(descFile)
