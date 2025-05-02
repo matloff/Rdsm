@@ -68,7 +68,7 @@ rthreadsJoin <- function(infoDir= '~')
    oldnj <- nJoined[1,1]
    nj <- oldnj + 1
    nJoined[1,1] <- nj
-   info$myID <- oldnj
+   info$myID <- nj
    unlock(mutex0)
    # pick up the shared variables
    sharedVarNames <- info$sharedVarNames
