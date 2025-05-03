@@ -12,6 +12,7 @@ setup <- function()  # run in "manager thread"
       n <- nvals[i]
       m[i,1:(n+1)] <- c(n,runif(n))
    }
+   nextRowNum[1,1] <- info$nThreads + 1
 }
 
 doSorts <- function()  # run in all threads
