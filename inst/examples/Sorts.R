@@ -7,6 +7,7 @@ setup <- function()  # run in "manager thread"
 {
    # generate vectors to be sorted, of different sizes
    tmp <- c(30000000,70000000)
+   set.seed(9999)
    nvals <- sample(tmp,10,replace=TRUE)  # 10 vectors to sort
    for (i in 1:10) {
       n <- nvals[i]
@@ -15,7 +16,7 @@ setup <- function()  # run in "manager thread"
    nextRowNum[1,1] <- info$nThreads + 1
 }
 
-doSorts <- function()  # run in all threads
+doSorts <- function()  # run in all threads, maybe with system.time()
 {
 
    rowNum <- myID  # my first vector to sort
