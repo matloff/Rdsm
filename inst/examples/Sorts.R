@@ -17,7 +17,7 @@ setup <- function()  # run in "manager thread"
 doSorts <- function()  # run in all threads
 {
 
-   rowNum <- info$myID  # my first vector to sort
+   rowNum <- myID  # my first vector to sort
 
    while (rowNum <= nrow(m)) {
       n <- m[rowNum,1]
