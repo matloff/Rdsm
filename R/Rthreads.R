@@ -49,7 +49,7 @@ rthreadsSetup <- function(
    }
 
    save(info,file=infoFile)
-   info$myID <- 1
+   assign('myID',1,envir = .GlobalEnv)
 
 }
 
@@ -68,7 +68,7 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
       oldnj <- nJoined[1,1]
       nj <- oldnj + 1
       nJoined[1,1] <- nj
-      info$myID <- nj
+      assign('myID',nj,envir = .GlobalEnv)
       unlock(mutex0)
    }
    # pick up the shared variables
