@@ -22,6 +22,9 @@ doSorts <- function()  # run in all threads, maybe with system.time()
    rowNum <- myID  # my first vector to sort
 
    while (rowNum <= nrow(m)) {
+      # as illustration of parallel operation, see which threads execute
+      # sorts on which rows
+      print(c(myID,rowNum))
       n <- m[rowNum,1]
       x <- m[rowNum,2:(n+1)]
       m[rowNum,2:(n+1)] <- sort(x)

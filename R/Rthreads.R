@@ -2,8 +2,9 @@
 require(bigmemory)
 require(synchronicity)
 
-# note on sharedVars: excludes mutexes but includes barriers;
-# example value is list(a=c(5,2),b=(2,6))
+# sharedVars excludes mutexes 
+# example value is list(a=c(5,2),b=(2,6)), specifying 
+# shared matrices 'a' and 'b', the former 5 x 2 and the latter 2 x 6
 
 rthreadsSetup <- function(
    nThreads,  # number of threads
@@ -25,7 +26,7 @@ rthreadsSetup <- function(
    # setup mutex0 and nJoined
    rthreadsMakeMutex('mutex0',infoDir)
    rthreadsMakeSharedVar('nJoined',1,1,infoDir)
-   nJoined[1,1] <- 1 
+   nJoined[1,1] <- 1  # ensure that mgr thread has ID 1 
 
    # set up the shared variables
    for (i in 1:length(sharedVars)) {
@@ -64,12 +65,13 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir)
       rthreadsAttachMutex('mutex0',infoDir)
-      lock(mutex0)
-      oldnj <- nJoined[1,1]
-      nj <- oldnj + 1
-      nJoined[1,1] <- nj
+#       lock(mutex0)
+#       oldnj <- nJoined[1,1]
+#       nj <- oldnj + 1
+#       nJoined[1,1] <- nj
+#       unlock(mutex0)
+      nj <- rthreadsAtomicInc('nJoined') + 1
       assign('myID',nj,envir = .GlobalEnv)
-      unlock(mutex0)
    }
    # pick up the shared variables
    sharedVarNames <- info$sharedVarNames
@@ -86,6 +88,21 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
    # wait for everyone else
    while (nJoined[1,1] < info$nThreads) {};
 
+}
+
+# atomically increases sharedV by increm, returning old value;
+# sharedV is the name of a shared variable; element [1,1] is
+# incrememted
+rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1) 
+{
+   mtx <- get(mtx)
+   lock(mtx)
+   shrdv <- get(sharedV)
+   oldVal <- shrdv[1,1]
+   newVal <- oldVal + increm
+   shrdv[1,1] <- newVal
+   unlock(mtx)
+   return(oldVal)
 }
 
 # create a variable shareable across threads
