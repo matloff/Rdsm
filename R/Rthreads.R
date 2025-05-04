@@ -25,8 +25,8 @@ rthreadsSetup <- function(
 
    # setup mutex0 and nJoined
    rthreadsMakeMutex('mutex0',infoDir)
-   rthreadsMakeSharedVar('nJoined',1,1,infoDir)
-   nJoined[1,1] <- 1  # ensure that mgr thread has ID 1 
+   rthreadsMakeSharedVar('nJoined',1,1,infoDir,1)
+   # nJoined[1,1] <- 1  # ensure that mgr thread has ID 1 
 
    # set up the shared variables
    for (i in 1:length(sharedVars)) {
@@ -106,9 +106,12 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
 }
 
 # create a variable shareable across threads
-rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir) 
+rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir,initVal=NULL) 
 {
    tmp <- big.matrix(nr,nc,type='double')
+   if (!is.null(initVal)) {
+      tmp[,] <- initVal
+   }
    desc <- describe(tmp)
    descFile <- paste0(infoDir,varName,'.desc')
    dput(desc,file=descFile)
