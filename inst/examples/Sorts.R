@@ -24,14 +24,11 @@ doSorts <- function()  # run in all threads, maybe with system.time()
    while (rowNum <= nrow(m)) {
       # as illustration of parallel operation, see which threads execute
       # sorts on which rows
-      print(c(myID,rowNum))
+      print(rowNum)
       n <- m[rowNum,1]
       x <- m[rowNum,2:(n+1)]
       m[rowNum,2:(n+1)] <- sort(x)
-      lock(mutex0)
-      rowNum <- nextRowNum[1,1]
-      nextRowNum[1,1] <- rowNum + 1
-      unlock(mutex0)
+      rowNum <- rthreadsAtomicInc('nextRowNum')
    }
 
 }
