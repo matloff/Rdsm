@@ -2,9 +2,18 @@
 require(bigmemory)
 require(synchronicity)
 
-# sharedVars excludes mutexes 
-# example value is list(a=c(5,2),b=(2,6)), specifying 
-# shared matrices 'a' and 'b', the former 5 x 2 and the latter 2 x 6
+# sharedVars 
+
+#    excludes mutexes 
+
+#    example value is list(a=c(5,2),b=(2,6)) 
+
+#       specifying shared matrices 'a' and 'b', 
+#       the former 5 x 2 and the latter 2 x 6
+
+#    the list values could be more than 2-tuples, having lengths
+#    3 or more; the function rthreadsSetup handles the
+#    case of length 3
 
 rthreadsSetup <- function(
    nThreads,  # number of threads
@@ -31,8 +40,13 @@ rthreadsSetup <- function(
    # set up the shared variables
    for (i in 1:length(sharedVars)) {
       varName <- names(sharedVars)[i]
-      nrowcol <- sharedVars[[i]]
-      rthreadsMakeSharedVar(varName,nrowcol[1],nrowcol[2],infoDir)
+      nrowcoletc <- sharedVars[[i]]
+      if (length(nrowcoletc) != 3) {
+         rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir)
+      } else {
+         rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir,
+            initVal=nrowcoletc[3])
+      }
       info$sharedVarNames <- c(info$sharedVarNames,varName)
    }
 

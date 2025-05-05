@@ -1,7 +1,7 @@
 
 # threads configuration: run
 # rthreadsSetup(nThreads=2,
-#    sharedVars=list(nextRowNum=c(1,1),m=c(10,100000000)))
+#    sharedVars=list(nextRowNum=c(1,1,3),m=c(10,100000000)))
 
 setup <- function()  # run in "manager thread"
 {
@@ -13,7 +13,7 @@ setup <- function()  # run in "manager thread"
       n <- nvals[i]
       m[i,1:(n+1)] <- c(n,runif(n))
    }
-   nextRowNum[1,1] <- info$nThreads + 1
+   # nextRowNum[1,1] <- info$nThreads + 1
 }
 
 doSorts <- function()  # run in all threads, maybe with system.time()
