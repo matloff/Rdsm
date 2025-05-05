@@ -17,7 +17,7 @@ require(synchronicity)
 
 rthreadsSetup <- function(
    nThreads,  # number of threads
-   sharedVars,  # see above
+   sharedVars = NULL,  # see above
    mutexNames = NULL,  # other than 'mutex0'
    infoDir = '~/'
 ) 
@@ -32,22 +32,23 @@ rthreadsSetup <- function(
 
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
-   # setup mutex0 and nJoined
    rthreadsMakeMutex('mutex0',infoDir)
    rthreadsMakeSharedVar('nJoined',1,1,infoDir,1)
-   # nJoined[1,1] <- 1  # ensure that mgr thread has ID 1 
+   rthreadsMakeSharedVar('nDone',1,1,infoDir,0)
 
    # set up the shared variables
-   for (i in 1:length(sharedVars)) {
-      varName <- names(sharedVars)[i]
-      nrowcoletc <- sharedVars[[i]]
-      if (length(nrowcoletc) != 3) {
-         rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir)
-      } else {
-         rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir,
-            initVal=nrowcoletc[3])
+   if (!is.null(sharedVars)) {
+      for (i in 1:length(sharedVars)) {
+         varName <- names(sharedVars)[i]
+         nrowcoletc <- sharedVars[[i]]
+         if (length(nrowcoletc) != 3) {
+            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir)
+         } else {
+            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir,
+               initVal=nrowcoletc[3])
+         }
+         info$sharedVarNames <- c(info$sharedVarNames,varName)
       }
-      info$sharedVarNames <- c(info$sharedVarNames,varName)
    }
 
    # set up the application-specific mutexes
@@ -79,19 +80,17 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir)
       rthreadsAttachMutex('mutex0',infoDir)
-#       lock(mutex0)
-#       oldnj <- nJoined[1,1]
-#       nj <- oldnj + 1
-#       nJoined[1,1] <- nj
-#       unlock(mutex0)
       nj <- rthreadsAtomicInc('nJoined') + 1
       assign('myID',nj,envir = .GlobalEnv)
    }
    # pick up the shared variables
    sharedVarNames <- info$sharedVarNames
-   for (i in 1:length(sharedVarNames)) {
-      rthreadsAttachSharedVar(sharedVarNames[i],infoDir)
+   if (!is.null(sharedVarNames)) {
+      for (i in 1:length(sharedVarNames)) {
+         rthreadsAttachSharedVar(sharedVarNames[i],infoDir)
+      }
    }
+   
    # pick up the application-specific mutexes
    mutexNames <- info$mutexNames
    if (!is.null(mutexNames)) {
@@ -154,5 +153,11 @@ rthreadsAttachMutex <- function(mutexName,infoDir)
    descFile <- paste0(infoDir,mutexName,'.desc')
    desc <- dget(descFile)
    assign(mutexName,attach.mutex(desc),envir = .GlobalEnv)
+}
+
+rthreadsWaitDone <- function() 
+{
+   rthreadsAtomicInc('nDone')
+   while (nDone[1,1] <- info$nThreads) {}
 }
 
