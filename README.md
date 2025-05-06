@@ -7,7 +7,8 @@
 * Fast packages like **data.table** rely on threads at the C++ level,
   using the C/C++ library OpenMP..
 
-* Threaded coding tends to be clearer and faster.
+* Threaded coding tends to be clearer and faster, compared to
+  message-passing.
 
 * Thus having a threads capability in R would greatly enhance
   R's capabilities in parallel processing.
@@ -50,10 +51,7 @@
 
   * This is to facilitate debugging application code.
 
-  * Use **tmux** if screen space is an issue.
-
-  * Future editions will automate the window creation and run
-    of **rthreadsJoin**.
+  * Use **tmux** if screen space is an issue. See below.
 
 * Run **rthreadsSetup** in the first window (the "manager
   thread"), then run **rthreadsJoin** in each window.
