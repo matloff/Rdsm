@@ -7,9 +7,14 @@
 * Fast packages like **data.table** rely on threads at the C++ level,
   using the C/C++ library OpenMP..
 
-* The **Rthreads** package enables a threads capability for R coders.
+* Threaded coding tends to be clearer and faster.
 
-* Physical shared RAM.
+* Thus having a threads capability in R would greatly enhance
+  R's capabilities in parallel processing.
+
+## Implementation
+
+* True physical shared RAM, via **bigmemory** package.
 
 * Parallel computation under the shared-memory paradigm.
 
@@ -17,7 +22,7 @@
 
 * Formerly the **Rdsm** package, but fully rewritten.
 
-# Advantages of Shared-Memory Approach
+# Advantages of Threaded, Shared-Memory Approach
 
 * Alternative is message-passing, e.g. **parallel** package,
   including via **foreach** interface.
