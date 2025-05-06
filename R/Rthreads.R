@@ -79,6 +79,7 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
    infoDir <- info$infoDir
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir)
+      rthreadsAttachSharedVar('nDone',infoDir)
       rthreadsAttachMutex('mutex0',infoDir)
       nj <- rthreadsAtomicInc('nJoined') + 1
       assign('myID',nj,envir = .GlobalEnv)
@@ -158,6 +159,6 @@ rthreadsAttachMutex <- function(mutexName,infoDir)
 rthreadsWaitDone <- function() 
 {
    rthreadsAtomicInc('nDone')
-   while (nDone[1,1] <- info$nThreads) {}
+   while (nDone[1,1] < info$nThreads) {}
 }
 
