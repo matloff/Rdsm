@@ -1,8 +1,7 @@
 
-import(parallel,bigmemory)
+import(bigmemory,synchronicity)
 
-export(mgrinit,mgrmakevar,mgrmakelock,makebarr,barr,
-   rdsmlock,rdsmunlock,
-   getidxs,getmatrix,stoprdsm,
-   readsync,writesync,loadex)
- 
+export(rthreadsSetup,rthreadsJoin,rthreadsAtomicInc,rthreadsAttachMutex,
+   rthreadsAttachSharedVar,rthreadsMakeMutex,rthreadsMakeSharedVar,
+   rthreadsWaitDone)
+
