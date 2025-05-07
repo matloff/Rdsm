@@ -112,9 +112,9 @@ rthreadsSetup(nThreads=2,
    sharedVars=list(nextRowNum=c(1,1,3),m=c(10,100000000)))
 ```
 
-This sets up 2 thraads (running in the 2 windows), and 2 shared
-variables **nextRowNum**, a scalar, and **m**, our matrix of rows to be
-sorted, 10 rows of length 100000000 each.
+This sets up 2 threads (running in the 2 windows), and 2 shared
+variables: **nextRowNum**, a scalar, and **m**, the latter being our
+matrix of rows to be sorted, 10 rows of length 100000000 each.
 
 3. In W1 run
 
@@ -128,7 +128,8 @@ and in W2 run
 rthreadsJoin(mgrThread=FALSE)
 ```
 
-Here each thread "checks in," and attaches the shared variables.
+Here each thread "checks in," attaches the shared variables, sets its
+ID, and then waits until all the threads have joined.
 
 4. In W1, run **setup()** to generate the data.
 
@@ -139,20 +140,77 @@ Overview of the code:
 * Each thread works on one row of **m** at a time. 
 
 * When a thread finishes sorting a row, it determines the next row to 
-  sort by the shared variable **nextRowNum**. It increments that
-  variable by 1, using the new value as the row it will now sort.
+  sort by inspecting the shared variable **nextRowNum**. It increments that
+  variable by 1, using the old value as the row it will now sort.
 
 * The incrementing much be done *atomically*. Remember, **nextRowNum**
   is a shared variable. Say its value is currently 7, and two threads
-  execute the incrementation at about the same time. We'd like one
-  thread to next sort row 8 and the other to sort row 9, with the
-  new value of **nextRowNum** now being 10. But if there is no
-  constraint, both threads may get the value 7, with **nextRowNum**
-  now being 8. Use of **rthreadsAtomicInc** ensures that only one thread
-  can access **nextRowNum** at a time.
+  execute the incrementation at about the same time. We'd like one thread
+  to next sort row 8 and the other to sort row 9, with the new value of
+  **nextRowNum** now being 10. But if there is no constraint on
+  simultaneous access, both threads may get the value 7, with
+  **nextRowNum** now being 8. Use of **rthreadsAtomicInc** ensures that
+  only one thread can access **nextRowNum** at a time.
+
+* Here is the internal code for **rthreadsAtomicInc**:
+
+  ``` r
+  function(sharedV,mtx='mutex0',increm=1) 
+  {
+     mtx <- get(mtx)
+     lock(mtx)
+     shrdv <- get(sharedV)
+     oldVal <- shrdv[1,1]
+     newVal <- oldVal + increm
+     shrdv[1,1] <- newVal
+     unlock(mtx)
+     return(oldVal)
+  }
+  ```
+  
+  The key here is use of a *mutex* (short for "mutual exclusion"), which
+  can be locked and unlocked. While locked, no other thread is allowed to
+  enter the given lines of code. If one thread has locked the mutex and
+  another thread reaches the **lock** line, it will be blocked until the
+  mutex is unlocked. Mutexs come from the **synchronicity** package.
 
 * Note that non-shared variables have different values in different
   threads.
+
+# Facilitating Rthreads Use via 'screen' or 'tmux'
+
+In a given parallel processing project, one may run the same code many
+times. With **Rthreads**, this must be done by hand once for each
+thread. Thus methods for automating the process would be desirable. The
+Unix (Mac or Linux) **screen** and **tmux** utilities can be very
+helpful in this regard.
+
+Notably, these utilities enable us to have code running in one window write
+a specified string to another window. E.g. say we are in the shell of
+Window A. We can do, e.g. 
+
+``` bash
+screen -S WindowBScreen
+```
+
+in Window B to start a **screen** session there. Then in Window A
+we might run
+
+``` bash
+screen -S WindowB -X stuff 'ls'$'\n'
+```
+
+and the Unix **ls** command will run in Window B just as if we had typed
+it there ourself! Moreover, we might be running R in Window A, in which
+case we can run the above shell command via R's **system** function
+
+In other words, we can for instance automate the running of
+**rthreadsJoin** in all the windows, instead of having to type the
+command in each one.
+
+Furthermore, if we are concerned about using up available screen space,
+the above utilities allow one to have all the panes of a session in one
+physical space on the screen, switching between them on command.
 
 # To Learn More
 
