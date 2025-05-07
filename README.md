@@ -174,6 +174,20 @@ Overview of the code:
   another thread reaches the **lock** line, it will be blocked until the
   mutex is unlocked. Mutexs come from the **synchronicity** package.
 
+  The internal code for **rthreadsWaitDone** is similar:
+
+  ``` r
+  function() 
+  {
+     rthreadsAtomicInc('nDone')
+     while (nDone[1,1] < info$nThreads) {}
+  }
+  ```
+
+  Again, the **nDone** count must be incremented atomically. In a
+  scenario of simultaneous accesss like that above, the threads would wait
+  forever.
+
 * Note that non-shared variables have different values in different
   threads.
 
