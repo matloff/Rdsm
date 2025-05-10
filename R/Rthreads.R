@@ -65,11 +65,11 @@ rthreadsSetup <- function(
    }
 
    save(info,file=infoFile)
-   assign('myID',1,envir = .GlobalEnv)
+   assign('myID',0,envir = .GlobalEnv)
 
 }
 
-rthreadsJoin <- function(infoDir= '~',mgrThread) 
+rthreadsJoin <- function(infoDir= '~') 
 {
 
    # check in and get my ID
@@ -77,11 +77,12 @@ rthreadsJoin <- function(infoDir= '~',mgrThread)
    load(infoFile)
    info <<- info; rm(info)
    infoDir <- info$infoDir
+   mgrThread <- exists('myID')
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir)
       rthreadsAttachSharedVar('nDone',infoDir)
       rthreadsAttachMutex('mutex0',infoDir)
-      nj <- rthreadsAtomicInc('nJoined') + 1
+      nj <- rthreadsAtomicInc('nJoined') 
       assign('myID',nj,envir = .GlobalEnv)
    }
    # pick up the shared variables

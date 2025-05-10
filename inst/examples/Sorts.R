@@ -13,13 +13,12 @@ setup <- function()  # run in "manager thread"
       n <- nvals[i]
       m[i,1:(n+1)] <- c(n,runif(n))
    }
-   # nextRowNum[1,1] <- info$nThreads + 1
 }
 
 doSorts <- function()  # run in all threads, maybe with system.time()
 {
 
-   rowNum <- myID  # my first vector to sort
+   rowNum <- myID+1  # my first vector to sort
 
    while (rowNum <= nrow(m)) {
       # as illustration of parallel operation, see which threads execute
