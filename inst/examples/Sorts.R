@@ -30,6 +30,7 @@ doSorts <- function()  # run in all threads, maybe with system.time()
       rowNum <- rthreadsAtomicInc('nextRowNum')
    }
 
-   rthreadsWaitDone()
+   # rthreadsWaitDone()
+   rthreadsBarrier()
 
 }

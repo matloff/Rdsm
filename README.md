@@ -83,7 +83,7 @@ setup <- function()  # run in "manager thread"
 doSorts <- function()  # run in all threads, maybe with system.time()
 {
 
-   rowNum <- myID  # my first vector to sort
+   rowNum <- myID + 1  # my first vector to sort
 
    while (rowNum <= nrow(m)) {
       # as illustration of parallel operation, see which threads execute
@@ -116,16 +116,10 @@ This sets up 2 threads (running in the 2 windows), and 2 shared
 variables: **nextRowNum**, a scalar, and **m**, the latter being our
 matrix of rows to be sorted, 10 rows of length 100000000 each.
 
-3. In W1 run
+3. In both windows, run
 
 ```r 
-rthreadsJoin(mgrThread=TRUE)
-```
-
-and in W2 run
-
-```r 
-rthreadsJoin(mgrThread=FALSE)
+rthreadsJoin()
 ```
 
 Here each thread "checks in," attaches the shared variables, sets its

@@ -22,17 +22,18 @@ rthreadsSetup <- function(
    infoDir = '~/'
 ) 
 {
-
-   info <<- list(
-      nThreads = nThreads,
-      infoDir = infoDir,
-      sharedVarNames = NULL,
-      mutexNames = mutexNames
-   )
+   assign('info',
+      list(
+         nThreads = nThreads,
+         infoDir = infoDir,
+         sharedVarNames = NULL,
+         mutexNames = mutexNames
+      ),envir = .GlobalEnv)
 
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
    rthreadsMakeMutex('mutex0',infoDir)
+   rthreadsMakeBarrier(nThreads,infoDir)
    rthreadsMakeSharedVar('nJoined',1,1,infoDir,1)
    rthreadsMakeSharedVar('nDone',1,1,infoDir,0)
 
@@ -66,7 +67,6 @@ rthreadsSetup <- function(
 
    save(info,file=infoFile)
    assign('myID',0,envir = .GlobalEnv)
-
 }
 
 rthreadsJoin <- function(infoDir= '~') 
@@ -75,13 +75,15 @@ rthreadsJoin <- function(infoDir= '~')
    # check in and get my ID
    infoFile = paste0(infoDir,'/rthreadsInfo.RData')
    load(infoFile)
-   info <<- info; rm(info)
+   assign('info',info,envir = .GlobalEnv); rm(info)
    infoDir <- info$infoDir
    mgrThread <- exists('myID')
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir)
       rthreadsAttachSharedVar('nDone',infoDir)
       rthreadsAttachMutex('mutex0',infoDir)
+      rthreadsAttachSharedVar('barrier0',infoDir)
+      rthreadsAttachMutex('barrMutex0',infoDir)
       nj <- rthreadsAtomicInc('nJoined') 
       assign('myID',nj,envir = .GlobalEnv)
    }
@@ -101,10 +103,9 @@ rthreadsJoin <- function(infoDir= '~')
    }
 
    # wait for everyone else
-   while (nJoined[1,1] < info$nThreads) {};
+   while (nJoined[1,1] < info$nThreads) {}
 
 }
-
 # atomically increases sharedV by increm, returning old value;
 # sharedV is the name of a shared variable; element [1,1] is
 # incrememted
@@ -118,6 +119,12 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
    shrdv[1,1] <- newVal
    unlock(mtx)
    return(oldVal)
+}
+
+rthreadsMakeBarrier <- function(nThreads,infoDir)
+{
+   rthreadsMakeMutex('barrMutex0',infoDir)
+   rthreadsMakeSharedVar('barrier0',1,2,infoDir,c(nThreads,0))
 }
 
 # create a variable shareable across threads
@@ -161,5 +168,24 @@ rthreadsWaitDone <- function()
 {
    rthreadsAtomicInc('nDone')
    while (nDone[1,1] < info$nThreads) {}
+}
+
+rthreadsBarrier <- function() 
+{
+   mtx <- get('barrMutex0')
+   barr <- get('barrier0')
+   lock(mtx)
+   count <- barr[1,1]
+   sense <- barr[1,2]
+   if (count == 1) {  # all done
+      barr[1,1] <- info$nThreads
+      barr[1,2] <- 1 - barr[1,2]
+      unlock(mtx)
+      return()
+   } else {
+      barr[1,1] <- barr[1,1] - 1
+      unlock(mtx)
+      while (barr[1,2] != sense) {}
+   }
 }
 
