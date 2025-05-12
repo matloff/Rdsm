@@ -32,10 +32,10 @@ rthreadsSetup <- function(
 
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
-   rthreadsMakeMutex('mutex0',infoDir)
-   rthreadsMakeBarrier(nThreads,infoDir)
-   rthreadsMakeSharedVar('nJoined',1,1,infoDir,1)
-   rthreadsMakeSharedVar('nDone',1,1,infoDir,0)
+   rthreadsMakeMutex('mutex0',infoDir='~/')
+   rthreadsMakeBarrier(nThreads,infoDir='~/')
+   rthreadsMakeSharedVar('nJoined',1,1,infoDir='~/',initVal=1)
+   rthreadsMakeSharedVar('nDone',1,1,infoDir='~/',initVal=0)
 
    # set up the shared variables
    if (!is.null(sharedVars)) {
@@ -43,10 +43,11 @@ rthreadsSetup <- function(
          varName <- names(sharedVars)[i]
          nrowcoletc <- sharedVars[[i]]
          if (length(nrowcoletc) != 3) {
-            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir)
+            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],
+               infoDir='~/')
          } else {
-            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],infoDir,
-               initVal=nrowcoletc[3])
+            rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],
+               infoDir='~/', initVal=nrowcoletc[3])
          }
          info$sharedVarNames <- c(info$sharedVarNames,varName)
       }
@@ -79,11 +80,11 @@ rthreadsJoin <- function(infoDir= '~')
    infoDir <- info$infoDir
    mgrThread <- exists('myID')
    if (!mgrThread) {
-      rthreadsAttachSharedVar('nJoined',infoDir)
-      rthreadsAttachSharedVar('nDone',infoDir)
-      rthreadsAttachMutex('mutex0',infoDir)
-      rthreadsAttachSharedVar('barrier0',infoDir)
-      rthreadsAttachMutex('barrMutex0',infoDir)
+      rthreadsAttachSharedVar('nJoined',infoDir='~/')
+      rthreadsAttachSharedVar('nDone',infoDir='~/')
+      rthreadsAttachMutex('mutex0',infoDir='~/')
+      rthreadsAttachSharedVar('barrier0',infoDir='~/')
+      rthreadsAttachMutex('barrMutex0',infoDir='~/')
       nj <- rthreadsAtomicInc('nJoined') 
       assign('myID',nj,envir = .GlobalEnv)
    }
@@ -91,7 +92,7 @@ rthreadsJoin <- function(infoDir= '~')
    sharedVarNames <- info$sharedVarNames
    if (!is.null(sharedVarNames)) {
       for (i in 1:length(sharedVarNames)) {
-         rthreadsAttachSharedVar(sharedVarNames[i],infoDir)
+         rthreadsAttachSharedVar(sharedVarNames[i],infoDir='~/')
       }
    }
    
@@ -99,7 +100,7 @@ rthreadsJoin <- function(infoDir= '~')
    mutexNames <- info$mutexNames
    if (!is.null(mutexNames)) {
       for (i in 1:length(mutexNames)) 
-         rthreadsAttachSharedMutex(mutexNames[i],infoDir)
+         rthreadsAttachSharedMutex(mutexNames[i],infoDir='~/')
    }
 
    # wait for everyone else
@@ -121,14 +122,14 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
    return(oldVal)
 }
 
-rthreadsMakeBarrier <- function(nThreads,infoDir)
+rthreadsMakeBarrier <- function(nThreads,infoDir='~/')
 {
-   rthreadsMakeMutex('barrMutex0',infoDir)
-   rthreadsMakeSharedVar('barrier0',1,2,infoDir,c(nThreads,0))
+   rthreadsMakeMutex('barrMutex0',infoDir='~/')
+   rthreadsMakeSharedVar('barrier0',1,2,infoDir='~/',initVal=c(nThreads,0))
 }
 
 # create a variable shareable across threads
-rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir,initVal=NULL) 
+rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir='~/',initVal=NULL) 
 {
    tmp <- big.matrix(nr,nc,type='double')
    if (!is.null(initVal)) {
@@ -141,7 +142,7 @@ rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir,initVal=NULL)
 }
 
 # create a mutex shareable across threads
-rthreadsMakeMutex <- function(mutexName,infoDir) 
+rthreadsMakeMutex <- function(mutexName,infoDir='~/') 
 {
    tmp <- boost.mutex()
    desc <- describe(tmp)
@@ -150,14 +151,14 @@ rthreadsMakeMutex <- function(mutexName,infoDir)
    assign(mutexName,tmp,envir = .GlobalEnv)
 }
 
-rthreadsAttachSharedVar <- function(varName,infoDir) 
+rthreadsAttachSharedVar <- function(varName,infoDir='~/') 
 {
    descFile <- paste0(infoDir,varName,'.desc')
    desc <- dget(descFile)
    assign(varName,attach.big.matrix(desc),envir = .GlobalEnv)
 }
 
-rthreadsAttachMutex <- function(mutexName,infoDir) 
+rthreadsAttachMutex <- function(mutexName,infoDir='~/') 
 {
    descFile <- paste0(infoDir,mutexName,'.desc')
    desc <- dget(descFile)
