@@ -4,6 +4,7 @@
 
 setup <- function(preDAG,destVertex)  # run in "manager thread"
 {
+   library(bnlearn)
    # to generate a DAG, take any data frame and run it through, say,
    # bnlearn:hc
    adj <- amat(hc(preDAG))
@@ -22,9 +23,11 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
 findMinDists <- function(destVertex)  
    # run in all threads, maybe with system.time()
 {
-   rthreadsAttachSharedVar('adjm')
-   rthreadsAttachSharedVar('adjmPow')
-   rthreadsAttachSharedVar('done')
+   if (myID > 0) {
+      rthreadsAttachSharedVar('adjm')
+      rthreadsAttachSharedVar('adjmPow')
+      rthreadsAttachSharedVar('done')
+   }
    adjmCopy <- adjm[,]  # non-bigmem version
    n <- nrow(adjm)
    myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
@@ -33,11 +36,10 @@ findMinDists <- function(destVertex)
    # find "dead ends," vertices to lead nowhere
    tmp <- rowSums(adjmCopy)
    deadEnds <- which(tmp == 0)
-   
-   rthreadsBarrier()
 
    for (iter in 1:(n-1)) {
-      adjmPower[myRows,] <- adjmPower[myRows,] %*% adjmCopy
+      rthreadsBarrier()
+      adjmPow[myRows,] <- adjmPow[myRows,] %*% adjmCopy
       for (myRow in myRows) {
          if (done[myRow,1] == 0) {  # this origin vertex myRow not decided yet
             if (adjmPow[myRow,destVertex] > 0) {
@@ -46,7 +48,8 @@ findMinDists <- function(destVertex)
             } else {
                currDests <- which(adjmPow[myRow,] > 0)
                # check subset
-               if (intersect(currDests,deadEnds) == currDests) {
+               if (length(currDests) > 0)
+                  if (intersect(currDests,deadEnds) == currDests)  {
                   done[myRow,1] <- iter
                   done[myRow,2] <- 2
                }
