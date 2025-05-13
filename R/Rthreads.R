@@ -33,7 +33,7 @@ rthreadsSetup <- function(
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
 
    rthreadsMakeMutex('mutex0',infoDir='~/')
-   rthreadsMakeBarrier(nThreads,infoDir='~/')
+   rthreadsMakeBarrier()
    rthreadsMakeSharedVar('nJoined',1,1,infoDir='~/',initVal=1)
    rthreadsMakeSharedVar('nDone',1,1,infoDir='~/',initVal=0)
 
@@ -122,11 +122,13 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
    return(oldVal)
 }
 
-rthreadsMakeBarrier <- function(nThreads,infoDir='~/')
+rthreadsMakeBarrier <- function()
 {
-   rthreadsMakeMutex('barrMutex0',infoDir='~/')
-   rthreadsMakeSharedVar('barrier0',1,2,infoDir='~/',initVal=c(nThreads,0))
+   rthreadsMakeMutex('barrMutex0')
+   rthreadsMakeSharedVar('barrier0',1,2,initVal=c(info$nThreads,0))
 }
+
+rthreadsInitBarrier <- function() barrier0[1,] <- c(info$nThreads,0)
 
 # create a variable shareable across threads
 rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir='~/',initVal=NULL) 
@@ -186,7 +188,7 @@ rthreadsBarrier <- function()
    } else {
       barr[1,1] <- barr[1,1] - 1
       unlock(mtx)
-      while (barr[1,2] != sense) {}
+      while (barr[1,2] == sense) {}
    }
 }
 
