@@ -78,7 +78,7 @@ rthreadsJoin <- function(infoDir= '~')
    load(infoFile)
    assign('info',info,envir = .GlobalEnv); rm(info)
    infoDir <- info$infoDir
-   mgrThread <- exists('myID')
+   mgrThread <- exists('myID') && myID == 0
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir='~/')
       rthreadsAttachSharedVar('nDone',infoDir='~/')
