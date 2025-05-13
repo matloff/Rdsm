@@ -2,15 +2,20 @@
 # threads configuration: run
 # rthreadsSetup(nThreads=2)
 
-setup <- function(preDAG)  # run in "manager thread"
+setup <- function(preDAG,destVertex)  # run in "manager thread"
 {
    # to generate a DAG, take any data frame and run it through, say,
    # bnlearn:hc
-   tmpadj <- amat(hc(preDAG))
-   n <- nrow(tmpadj)
-   rthreadsMakeSharedVar('adjm',nr,nr,info$infoDir,tmpadj)
-   rthreadsMakeSharedVar('adjmPow',nr,nr,info$infoDir,tmpadj)
-   rthreadsMakeSharedVar('iterNum',1,1,info$infoDir,1)
+   adj <- amat(hc(preDAG))
+   n <- nrow(adj)
+   rthreadsMakeSharedVar('adjm',n,n,initVal=adj)
+   rthreadsMakeSharedVar('adjmPow',n,n,initVal=adj)
+   # if row i = (u,v) is not (0,0) then it means the path search ended
+   # after iteration u; v = 1 means reached the destination, v = 2
+   # means no paths to destination exist
+   rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n)
+   rthreadsMakeSharedVar('imDone',1,1,initVal=0)
+   rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
 
    read in the adjacency matrix from disk
    # generate vectors to be sorted, of different sizes
@@ -23,22 +28,39 @@ setup <- function(preDAG)  # run in "manager thread"
    }
 }
 
-findMinDists <- function()  # run in all threads, maybe with system.time()
+findMinDists <- function(destVertex)  
+   # run in all threads, maybe with system.time()
 {
-   rthreadsAttachSharedVar
+   rthreadsAttachSharedVar('adjm')
+   rthreadsAttachSharedVar('adjmPow')
+   rthreadsAttachSharedVar('done')
+   adjmCopy <- adjm[,]  # non-bigmem version
+   n <- nrow(adjm)
+   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+   mySubmatrix <- adjm[myRows,]
 
-   tmp <- parallel::splitIndices(nr,info$nThreads)
+   # find "dead ends," vertices to lead nowhere
+   tmp <- rowSums(adjmCopy)
+   deadEnds <- which(tmp == 0)
+   
+   rthreadsBarrier()
 
-   rowNum <- myID  # my first vector to sort
-
-   while (rowNum <= nrow(m)) {
-      # as illustration of parallel operation, see which threads execute
-      # sorts on which rows
-      print(rowNum)
-      n <- m[rowNum,1]
-      x <- m[rowNum,2:(n+1)]
-      m[rowNum,2:(n+1)] <- sort(x)
-      rowNum <- rthreadsAtomicInc('nextRowNum')
+   for (iter in 1:(n-1)) {
+      adjmPower[myRows,] <- adjmPower[myRows,] %*% adjmCopy
+      for (myRow in myRows) {
+         if (done[myRow,1] == ) {  # this origin not decided yet
+            if (adjm[myRow,destVertex] > 0) {
+               done[myRow,1] <- iter
+               done[myRow,2] <- 1
+            } else {
+               currDests <- which(adjm[myRow,] > 0)
+               if (all(currDests %in% deadEnds)) {
+                  done[myRow,1] <- iter
+                  done[myRow,2] <- 2
+               }
+            }
+         }
+      }
    }
 
    rthreadsWaitDone()
