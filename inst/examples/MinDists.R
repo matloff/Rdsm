@@ -13,19 +13,10 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
    # if row i = (u,v) is not (0,0) then it means the path search ended
    # after iteration u; v = 1 means reached the destination, v = 2
    # means no paths to destination exist
-   rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n)
+   rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n))
    rthreadsMakeSharedVar('imDone',1,1,initVal=0)
    rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
-
-   read in the adjacency matrix from disk
-   # generate vectors to be sorted, of different sizes
-   tmp <- c(30000000,70000000)
-   set.seed(9999)
-   nvals <- sample(tmp,10,replace=TRUE)  # 10 vectors to sort
-   for (i in 1:10) {
-      n <- nvals[i]
-      m[i,1:(n+1)] <- c(n,runif(n))
-   }
+   return()
 }
 
 findMinDists <- function(destVertex)  
@@ -48,13 +39,14 @@ findMinDists <- function(destVertex)
    for (iter in 1:(n-1)) {
       adjmPower[myRows,] <- adjmPower[myRows,] %*% adjmCopy
       for (myRow in myRows) {
-         if (done[myRow,1] == ) {  # this origin not decided yet
-            if (adjm[myRow,destVertex] > 0) {
+         if (done[myRow,1] == 0) {  # this origin vertex myRow not decided yet
+            if (adjmPow[myRow,destVertex] > 0) {
                done[myRow,1] <- iter
                done[myRow,2] <- 1
             } else {
-               currDests <- which(adjm[myRow,] > 0)
-               if (all(currDests %in% deadEnds)) {
+               currDests <- which(adjmPow[myRow,] > 0)
+               # check subset
+               if (intersect(currDests,deadEnds) == currDests) {
                   done[myRow,1] <- iter
                   done[myRow,2] <- 2
                }
