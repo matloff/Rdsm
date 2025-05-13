@@ -20,14 +20,16 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
    return()
 }
 
-findMinDists <- function(destVertex)  
+findMinDists <- function()  
    # run in all threads, maybe with system.time()
 {
    if (myID > 0) {
       rthreadsAttachSharedVar('adjm')
       rthreadsAttachSharedVar('adjmPow')
       rthreadsAttachSharedVar('done')
-   }
+      rthreadsAttachSharedVar('dstVrtx')
+   } else rthreadsInitBarrier()
+   destVertex <- dstVrtx[1,1]
    adjmCopy <- adjm[,]  # non-bigmem version
    n <- nrow(adjm)
    myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
