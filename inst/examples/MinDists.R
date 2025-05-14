@@ -1,6 +1,9 @@
 
 # threads configuration: run
-# rthreadsSetup(nThreads=2)
+#    rthreadsSetup(nThreads=2)
+
+# algorithm assumes a Directed Acyclic Graph (DAG); for test cases, an
+# easy 
 
 setup <- function(preDAG,destVertex)  # run in "manager thread"
 {
@@ -11,10 +14,10 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
    n <- nrow(adj)
    rthreadsMakeSharedVar('adjm',n,n,initVal=adj)
    rthreadsMakeSharedVar('adjmPow',n,n,initVal=adj)
-   # if row i = (u,v) is not (-1,-1) then it means the path search ended
+   # if row i = (u,v) is not (0,0) then it means the path search ended
    # after iteration u; v = 1 means reached the destination, v = 2
    # means no paths to destination exist
-   rthreadsMakeSharedVar('done',n,2,initVal=rep(-1,2*n))
+   rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n))
    rthreadsMakeSharedVar('imDone',1,1,initVal=0)
    rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
    rthreadsInitBarrier()
@@ -39,13 +42,15 @@ findMinDists <- function()
    # find "dead ends," vertices to lead nowhere
    tmp <- rowSums(adjmCopy)
    deadEnds <- which(tmp == 0)
-   done[-deadEnds,1] <- 0
-   done[-deadEnds,2] <- 2
+   done[deadEnds,1] <- 0
+   done[deadEnds,2] <- 2
+   # and don't need a path from destVertex to itself
+   done[destVertex,] <- c(0,2)
+   deadEndsPlusDV <- c(deadEnds,destVertex)
 
    for (iter in 1:(n-1)) {
       rthreadsBarrier()
-      adjmPow[myRows,] <- adjmPow[myRows,] %*% adjmCopy
-      for (myRow in setdiff(myRows,deadEnds)) {
+      for (myRow in setdiff(myRows,deadEndsPlusDV)) {
          if (done[myRow,1] == 0) {  # this origin vertex myRow not decided yet
             if (adjmPow[myRow,destVertex] > 0) {
                done[myRow,1] <- iter
@@ -63,6 +68,7 @@ findMinDists <- function()
             }
          }
       }
+      if (iter < n-1) adjmPow[myRows,] <- adjmPow[myRows,] %*% adjmCopy
       if (sum(done[,1] == 0) == 0) break
    }
 
