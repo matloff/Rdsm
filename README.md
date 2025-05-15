@@ -49,7 +49,10 @@
 
 * Each thread must run in its own terminal window.
 
-  * This is to facilitate debugging application code.
+  * This is to facilitate debugging application code. 
+
+    Note: Parallel programming is hard, in any form, and thus one may 
+    spend much more time debugging code than writing it.
 
   * Use **tmux** if screen space is an issue. See below.
 
