@@ -19,7 +19,7 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
    # means no paths to destination exist
    rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n))
    rthreadsMakeSharedVar('imDone',1,1,initVal=0)
-   rthreadsMakeSharedVar('NDone',n,2,initVal=rep(0,2*n))
+   rthreadsMakeSharedVar('NDone',1,1,initVal=0)
    rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
    rthreadsInitBarrier()
    return()
@@ -50,34 +50,34 @@ findMinDists <- function()
    deadEndsPlusDV <- c(deadEnds,destVertex)
 
    imDone <- FALSE
-   if (NDone[1,1] == info$nThreads) return()
    for (iter in 1:(n-1)) {
-if (iter == 2) browser()
-      if (iter > 1 && (iter < n-1))
-         adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
       rthreadsBarrier()
-      if (imDone) break
-      for (myRow in setdiff(myRows,deadEndsPlusDV)) {
-         if (done[myRow,1] == 0) {  # this origin vertex myRow not decided yet
-            if (adjmPow[myRow,destVertex] > 0) {
-               done[myRow,1] <- iter
-               done[myRow,2] <- 1
-            } else {
-               currDests <- which(adjmPow[myRow,] > 0)
-               # check subset
-               currDestsEmpty <- (length(currDests) == 0)
-               if (currDestsEmpty ||
-                   !currDestsEmpty &&
-                      identical(intersect(currDests,deadEnds),currDests))  {
+      if (NDone[1,1] == info$nThreads) return()
+      if (iter > 1 && (iter <= n-1))
+         adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+      if (!imDone) {
+         for (myRow in setdiff(myRows,deadEndsPlusDV)) {
+            if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
+               if (adjmPow[myRow,destVertex] > 0) {
                   done[myRow,1] <- iter
-                  done[myRow,2] <- 2
+                  done[myRow,2] <- 1
+               } else {
+                  currDests <- which(adjmPow[myRow,] > 0)
+                  # check subset
+                  currDestsEmpty <- (length(currDests) == 0)
+                  if (currDestsEmpty ||
+                      !currDestsEmpty &&
+                         identical(intersect(currDests,deadEnds),currDests))  {
+                     done[myRow,1] <- iter
+                     done[myRow,2] <- 2
+                  }
                }
             }
          }
-      }
-      if (sum(done[myRows,1] == 0) == 0) {
-         imDone <- TRUE
-         rthreadsAtomicInc('NDone')
+         if (sum(done[myRows,1] == 0) == 0) {
+            imDone <- TRUE
+            rthreadsAtomicInc('NDone')
+         }
       }
    }
 
