@@ -61,9 +61,9 @@
 
 * Now call your application function code in each window.
 
-# Example
+# Example 1
 
-Have a number of vectors, each to be sorted.
+We have a number of vectors, each to be sorted.
 
 ``` r
 
@@ -187,6 +187,185 @@ Overview of the code:
 
 * Note that non-shared variables have different values in different
   threads.
+
+# Example 2: Shortest paths in a graph
+
+We have a *graph* or *network*, consisting of people, cities or
+whatever, with links between some of them, and wish to find the shortest
+path from all vertices A to a vertex B. This ia a famous problem, with
+lots of applications. Here we take a matrix approach, with a parallel
+solution via **Rthreads**.
+
+We treat the case of *directed* graphs, meaning that a link from vertex
+i to vertex j does not imply that a link exists in the opposite
+direction.  For a graph of v vertices, the *adjacency matrix* M of the
+graph is v X v, with the row i, column j element being 1 or 0, depending
+on whether there is a link from i to j.
+
+Here is the code:
+
+``` r
+# threads configuration: run
+#    rthreadsSetup(nThreads=2)
+
+# algorithm assumes a Directed Acyclic Graph (DAG); for test cases, an
+# easy 
+
+setup <- function(preDAG,destVertex)  # run in "manager thread"
+{
+   library(bnlearn)
+   # to generate a DAG, take any data frame and run it through, say,
+   # bnlearn:hc
+   adj <- amat(hc(preDAG))
+   n <- nrow(adj)
+   rthreadsMakeSharedVar('adjm',n,n,initVal=adj)
+   rthreadsMakeSharedVar('adjmPow',n,n,initVal=adj)
+   # if in row i = (u,v), u is not 0 then it means this path search ended
+   # after iteration u; v = 1 means reached the destination, v = 2
+   # means no paths to destination exist
+   rthreadsMakeSharedVar('done',n,2,initVal=rep(0,2*n))
+   rthreadsMakeSharedVar('imDone',1,1,initVal=0)
+   rthreadsMakeSharedVar('NDone',1,1,initVal=0)
+   rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
+   rthreadsInitBarrier()
+   return()
+}
+
+findMinDists <- function()  
+   # run in all threads, maybe with system.time()
+{
+   if (myID > 0) {
+      rthreadsAttachSharedVar('adjm')
+      rthreadsAttachSharedVar('adjmPow')
+      rthreadsAttachSharedVar('done')
+      rthreadsAttachSharedVar('NDone')
+      rthreadsAttachSharedVar('dstVrtx')
+   } 
+
+   destVertex <- dstVrtx[1,1]
+
+   n <- nrow(adjm[,])
+   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+   mySubmatrix <- adjm[myRows,]
+
+   # find "dead ends," vertices to lead nowhere
+   tmp <- rowSums(adjm[,])
+   deadEnds <- which(tmp == 0)
+   done[deadEnds,1] <- 1
+   done[deadEnds,2] <- 2
+   # and don't need a path from destVertex to itself
+   done[destVertex,] <- c(1,2)
+   deadEndsPlusDV <- c(deadEnds,destVertex)
+
+   imDone <- FALSE
+   for (iter in 1:(n-1)) {
+      rthreadsBarrier()
+      if (NDone[1,1] == info$nThreads) return()
+      if (iter > 1 && (iter <= n-1))
+         adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+      if (!imDone) {
+         for (myRow in setdiff(myRows,deadEndsPlusDV)) {
+            if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
+               if (adjmPow[myRow,destVertex] > 0) {
+                  done[myRow,1] <- iter
+                  done[myRow,2] <- 1
+               } else {
+                  currDests <- which(adjmPow[myRow,] > 0)
+                  # check subset
+                  currDestsEmpty <- (length(currDests) == 0)
+                  if (currDestsEmpty ||
+                      !currDestsEmpty &&
+                         identical(intersect(currDests,deadEnds),currDests))  {
+                     done[myRow,1] <- iter
+                     done[myRow,2] <- 2
+                  }
+               }
+            }
+         }
+         if (sum(done[myRows,1] == 0) == 0) {
+            imDone <- TRUE
+            rthreadsAtomicInc('NDone')
+         }
+      }
+   }
+
+}
+
+```
+
+A key property is that the k-th power of M tells us whether there is a
+k-link path from i to j, according to whether the row i, column j
+element is nonzero. The matrix powers are computed in parallel, with
+each thread being responsible for a subset of rows:
+
+``` r
+n <- nrow(adjm[,])
+myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+mySubmatrix <- adjm[myRows,]
+...
+adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+```
+
+As noted, we will find the shortest distance from all vertices A to a
+given destination B, which is **destVertex** in the code. We will store
+results in the shared matrix **done**, and in fact that object will
+contain the final results in the end. If row i in **done** has value
+(r,s), it means that in iteration r our search for paths from i to the
+destination ended in iteration i. If s = 1, that means the destination
+was reached in a path of r links; if s = 2, it is impossible to get from
+i to the destination.
+
+We assume the graph is *acyclic*, meaning that once we leave a vertex i,
+there is no path back to that vertex. Thus any path can be of length at
+most **n-1**, and typically will be shorter. Not only might a path reach
+the destination with fewer jumps, but also a path might end at an
+*absorbing vertex*, one with no outgoing links. We refer to them as
+"dead ends" in the code.
+
+Taking all this into account, we see that even though our **for**
+loop has a nominal number of iterations **n-1**, we often will exit the
+loop well before that.
+
+Now, let's take a closer look at the beginning of the loop:
+
+``` r
+for (iter in 1:(n-1)) {
+   rthreadsBarrier()
+   if (NDone[1,1] == info$nThreads) return()
+   if (iter > 1 && (iter <= n-1))
+      adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+```
+
+The *barrier* is an important threads concept. When a thread reaches
+that line, it may not proceed further until *all* threads have reached
+the line. Why is this needed here? Actually, we don't need it in this
+particular case, but I've included it to explain the barrier concept, as
+follows.
+
+The concern is that we might have, say, thread 3 starting iteration 10,
+but thread 2 is still in iteration 9. When thread 3 modifies the shared
+power matrix,
+
+``` r
+adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+```
+
+thread 2 may still be using the old version. If thread 3 modifies the
+matrix before thread 2 finishes using the old version, then this thread
+will likely compute incorrectly.
+
+That actually can't happen here, as each thread works only with its own
+rows of the matrix, not just in the matrix multiplication process, but
+also in the path computations, e.g.
+
+``` r
+if (adjmPow[myRow,destVertex] > 0) {
+   done[myRow,1] <- iter
+   done[myRow,2] <- 1
+```
+
+But again, in other similar applications, the threads' work is not so
+well separated, and a barrier would be needed.
 
 # Facilitating Rthreads Use via 'screen' or 'tmux'
 
