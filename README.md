@@ -2,15 +2,20 @@
 
 # Filling an Important Gap
 
+* *Threading* is a major mechanism for parallel operations in the world
+  of computing.
+
+* Using C/C++, a popular threading library is OpenMP.
+
 * R does not have native threading.
 
 * Lack of threading in R means that developers of fast packages 
   like **data.table** must rely on threads at the C++ level.
 
-* Alternative to threads is message-passing, e.g. **parallel** package,
-  including via **foreach** interface.
+* Alternative to threads is *message-passing*, e.g. R's **parallel**
+  package, including via **foreach** interface.
 
-  Threaded coding tends to be clearer and faster, compared to
+* Threaded coding tends to be clearer and faster, compared to
   message-passing.
 
 * Thus having a threads capability in R would greatly enhance
@@ -18,38 +23,51 @@
 
 # What Is the Difference between Threading and Message Passing?
 
-* Say we are on a quad-core machine. 
+* Say we are on a quad-core machine. Here is an overview of the two
+  paradigms (lots of variants, not covered here):
 
 * Message passing:
 
-  * We would write 2 pieces of code, a worker and a manager. There
+  * We would write 2 functions, a worker and a manager. There
     would be 4 copies of the worker code, running fully independently.
+
+  * The manager would communicate with the workers by sending/receiving
+    messages across the network.
 
   * The manager would, say, break a task into 4 chunks, and send the
     chunks to the workers.
 
   * Each worker would work on its chunk, then send the result back
-    to the manager.
+    to the manager, which would combine the received results.
+
+  * Example: Sorting. Each worker sorts its chunk, then the manager
+    merges the results to obtain the final sorted vector.
 
 * Threading:
 
   * There would be no manager, just 4 copies of worker code (different
-    code from the MP case).
+    code from the message-passing case).
+
+  * The threads assign themselves chunks of work to do, instead of being
+    assigned by manager code.
+
+  * Similarly, the threads combine the results of work on chunks on
+    their own, rather than manager code doing this.
 
   * The workers operate mostly independently, but interact via variables
     in shared RAM. One thread might modify a shared variable **x**, and
     then another thread might read the new value.
 
-* Then 4 copies of our code would run, mostly independently, 
-  but with some shared variables.
+  * Say **x** is shared and **y** is nonshared. Then there is only one
+    copy of **x** but 4 copies of **y**.
 
-* Say **x** is shared and **y** is nonshared. Then there is only
-  one copy of **x** but 4 copies of **y**.
+  * By the way, what about Python? It does have threading capability,
+    but has always useless for parallel computation, as its *Global
+    Interpreter Lock* disallows more than one thread running at a time.
+    However, the newest version of Python has an experimental GIL-less
+    option.
 
-* One thread might modify **x**, with another thread then reading
-  the new value of **x**.
-
-## Implementation
+# Rthreads Implementation
 
 * True physical shared RAM, via **bigmemory** package.
 
@@ -61,7 +79,7 @@
 
 # How Rthreads Works
 
-* The sole data type is matrix. In **bigmemory**, this must be
+* The sole data type is matrix, a **bigmemory** constraint. this must be
   explicitly written with two (possibly empty) subscripts,
   e.g. **x[3,2]**, **x[,1:5]**, **x[,]**.
 
@@ -76,8 +94,8 @@
 
   * Use **tmux** if screen space is an issue. See below.
 
-* Run **rthreadsSetup** in the first window (the "manager
-  thread"), then run **rthreadsJoin** in each window.
+* Run **rthreadsSetup** in the first window, 
+  then run **rthreadsJoin** in each window.
 
   Now call your application function code in each window.
 
@@ -126,7 +144,7 @@ doSorts <- function()  # run in all threads, maybe with system.time()
 
 To run, say with just 2 threads:
 
-1. Open 2 terminal windows, to be referred to as W1 and W2.
+1. Let's refer to the 2 terminal windows as W1 and W2.
 
 2. In W1, run
 
@@ -160,11 +178,11 @@ Overview of the code:
   sort by inspecting the shared variable **nextRowNum**. It increments that
   variable by 1, using the old value as the row it will now sort.
 
-* The incrementing much be done *atomically*. Remember, **nextRowNum**
+* The incrementing must be done *atomically*. Remember, **nextRowNum**
   is a shared variable. Say its value is currently 7, and two threads
   execute the incrementation at about the same time. We'd like one thread
-  to next sort row 8 and the other to sort row 9, with the new value of
-  **nextRowNum** now being 10. But if there is no constraint on
+  to next sort row 7 and the other to sort row 8, with the new value of
+  **nextRowNum** now being 9. But if there is no constraint on
   simultaneous access, both threads may get the value 7, with
   **nextRowNum** now being 8. Use of **rthreadsAtomicInc** ensures that
   only one thread can access **nextRowNum** at a time.
@@ -187,9 +205,9 @@ Overview of the code:
   
   The key here is use of a *mutex* (short for "mutual exclusion"), which
   can be locked and unlocked. While locked, no other thread is allowed to
-  enter the given lines of code. If one thread has locked the mutex and
+  enter the given section of code. If one thread has locked the mutex and
   another thread reaches the **lock** line, it will be blocked until the
-  mutex is unlocked. Mutexs come from the **synchronicity** package.
+  mutex is unlocked. Mutexes come from the **synchronicity** package.
 
   The internal code for **rthreadsWaitDone** is similar:
 
@@ -203,11 +221,18 @@ Overview of the code:
 
   Again, the **nDone** count must be incremented atomically. In a
   scenario of simultaneous accesss like that above, the threads would wait
-  forever.
+  forever (a common bug in parallel computation).
 
-* Note that non-shared variables have different values in different
-  threads.
+* As noted earlier, in threads programming, the threads assign work to
+  themselves, instead of manager code doing so. Here this is done via
+  the shared variable **nextRowNum**.
 
+  Another possibility would be to have threads *pre*-assign work to
+  themselves. With 10 rows and 2 threads, for instance, the first thread
+  could work on rows 1 through 5, with the second handling rows 6 to 10.
+  But this may not work well in settings with *load imbalance*, where
+  some rows require more work than others (as with our test case here).
+ 
 # Example 2: Shortest paths in a graph
 
 We have a *graph* or *network*, consisting of people, cities or
@@ -219,8 +244,8 @@ solution via **Rthreads**.
 We treat the case of *directed* graphs, meaning that a link from vertex
 i to vertex j does not imply that a link exists in the opposite
 direction.  For a graph of v vertices, the *adjacency matrix* M of the
-graph is v X v, with the row i, column j element being 1 or 0, depending
-on whether there is a link from i to j.
+graph is of size v X v, with the row i, column j element being 1 or 0,
+depending on whether there is a link from i to j.
 
 Here is the code:
 
@@ -326,6 +351,9 @@ mySubmatrix <- adjm[myRows,]
 adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
 ```
 
+Here we have used the fact that in a matrix product W = UV, row i of W
+is equal to the product of row i of U with V.
+
 As noted, we will find the shortest distance from all vertices A to a
 given destination B, which is **destVertex** in the code. We will store
 results in the shared matrix **done**, and in fact that object will
@@ -337,14 +365,62 @@ i to the destination.
 
 We assume the graph is *acyclic*, meaning that once we leave a vertex i,
 there is no path back to that vertex. Thus any path can be of length at
-most **n-1**, and typically will be shorter. Not only might a path reach
-the destination with fewer jumps, but also a path might end at an
+most **n-1** links, and typically will be shorter. Not only might a path reach
+the destination with fewer links, but also a path might end at an
 *absorbing vertex*, one with no outgoing links. We refer to them as
 "dead ends" in the code.
 
 Taking all this into account, we see that even though our **for**
 loop has a nominal number of iterations **n-1**, we often will exit the
 loop well before that.
+
+Again as noted earlier, each thread assigns itself a chunk of the work. That's
+done here:
+
+``` r
+   n <- nrow(adjm[,])
+   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+   mySubmatrix <- adjm[myRows,]
+```
+
+If say the matrix has 100 rows and we have 2 threads, the first thread
+will assign itself rows 1 to 50, and the second will handle rows 51 to
+100.
+
+Here is where the main work is done:
+
+``` r
+for (myRow in setdiff(myRows,deadEndsPlusDV)) {
+   if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
+      if (adjmPow[myRow,destVertex] > 0) {
+         done[myRow,1] <- iter
+         done[myRow,2] <- 1
+      } else {
+         currDests <- which(adjmPow[myRow,] > 0)
+         # check subset
+         currDestsEmpty <- (length(currDests) == 0)
+         if (currDestsEmpty ||
+             !currDestsEmpty &&
+                identical(intersect(currDests,deadEnds),currDests))  {
+            done[myRow,1] <- iter
+            done[myRow,2] <- 2
+         }
+      }
+   }
+}
+```
+
+Here we exclude the dead ends, and also the destination vertex. 
+
+The "if" section here is straightforward; if we find that on this
+iteration there is at least some path, of those traversed so far, to the
+destination, we update **done** accordingly.
+
+The "else" part looks at the nonzero elements of the power matrix in the
+current iteration. These tell us all the vertices at which we could be
+after hopping this nummber of links. The question is then, are all such
+vertices dead ends? If so, we've found that it is impossible to reach
+the destination from vertex **myRow**, and we update **done** accordingly.
 
 Now, let's take a closer look at the beginning of the loop:
 
@@ -384,8 +460,12 @@ if (adjmPow[myRow,destVertex] > 0) {
    done[myRow,2] <- 1
 ```
 
-But again, in other similar applications, the threads' work is not so
-well separated, and a barrier would be needed.
+But suppose instead of the threads pre-assigning groups of rows to
+themselves, they would use a scheme similar to Example 1's use of
+**nextRowNum**. When all threads are done with a given iteration,
+we would need to reset that variable to 1. But we would need to
+ascertain that all threads are indeed done with that iteration, and a
+barrier would accomplish that goal.
 
 # Facilitating Rthreads Use via 'screen' or 'tmux'
 
