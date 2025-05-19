@@ -1,17 +1,53 @@
-# Rthreads
+# Rthreads -- Threads for R!
 
-## *Threads for R!*
+# Filling an Important Gap
 
 * R does not have native threading.
 
-* Fast packages like **data.table** rely on threads at the C++ level,
-  using the C/C++ library OpenMP..
+* Lack of threading in R means that developers of fast packages 
+  like **data.table** must rely on threads at the C++ level.
 
-* Threaded coding tends to be clearer and faster, compared to
+* Alternative to threads is message-passing, e.g. **parallel** package,
+  including via **foreach** interface.
+
+  Threaded coding tends to be clearer and faster, compared to
   message-passing.
 
 * Thus having a threads capability in R would greatly enhance
   R's capabilities in parallel processing.
+
+# What Is the Difference between Threading and Message Passing?
+
+* Say we are on a quad-core machine. 
+
+* Message passing:
+
+  * We would write 2 pieces of code, a worker and a manager. There
+    would be 4 copies of the worker code, running fully independently.
+
+  * The manager would, say, break a task into 4 chunks, and send the
+    chunks to the workers.
+
+  * Each worker would work on its chunk, then send the result back
+    to the manager.
+
+* Threading:
+
+  * There would be no manager, just 4 copies of worker code (different
+    code from the MP case).
+
+  * The workers operate mostly independently, but interact via variables
+    in shared RAM. One thread might modify a shared variable **x**, and
+    then another thread might read the new value.
+
+* Then 4 copies of our code would run, mostly independently, 
+  but with some shared variables.
+
+* Say **x** is shared and **y** is nonshared. Then there is only
+  one copy of **x** but 4 copies of **y**.
+
+* One thread might modify **x**, with another thread then reading
+  the new value of **x**.
 
 ## Implementation
 
@@ -23,23 +59,7 @@
 
 * Formerly the **Rdsm** package, but fully rewritten.
 
-# Advantages of Threaded, Shared-Memory Approach
-
-* Alternative is message-passing, e.g. **parallel** package,
-  including via **foreach** interface.
-
-* Faster execution, since under the shared-memory approach, there is no
-  expensive repeated passing of data from one process to another as in
-  message-passing.
-
-* Threads manage their own task assignment, rather via communication
-  from a central process.
-
-* Clearer code.
-
-# How It Works
-
-* The shared memory is implemented via the **bigmemory** package.
+# How Rthreads Works
 
 * The sole data type is matrix. In **bigmemory**, this must be
   explicitly written with two (possibly empty) subscripts,
@@ -59,7 +79,7 @@
 * Run **rthreadsSetup** in the first window (the "manager
   thread"), then run **rthreadsJoin** in each window.
 
-* Now call your application function code in each window.
+  Now call your application function code in each window.
 
 # Example 1
 
