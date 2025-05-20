@@ -469,15 +469,17 @@ barrier would accomplish that goal.
 
 # Facilitating Rthreads Use via 'screen' or 'tmux'
 
-In a given parallel processing project, one may run the same code many
-times. With **Rthreads**, this must be done by hand once for each
-thread. Thus methods for automating the process would be desirable. The
-Unix (Mac or Linux) **screen** and **tmux** utilities can be very
-helpful in this regard.
+In using **Rthreads**, one needs a separate terminal window for each
+thread. Some users may have concerns over the screen real estate that is
+used.  The popular Unix (Mac or Linux) **screen** and **tmux** utilities
+can be very helpful in this regard. Basically, they allow multiple
+terminal windows to share the same screen space.
 
-Notably, these utilities enable us to have code running in one window write
-a specified string to another window. E.g. say we are in the shell of
-Window A. We can do, e.g. 
+Methods for automating the process of setting up the windows, running
+e.g. **rthreadsJoin** in each one would be desirable.  The above
+utilities can accomplish this by enabling us to have code running in one
+window write a specified string to another window. E.g. say we are in
+the shell of Window A. We can do, e.g. 
 
 ``` bash
 screen -S WindowBScreen
@@ -497,10 +499,6 @@ case we can run the above shell command via R's **system** function
 In other words, we can for instance automate the running of
 **rthreadsJoin** in all the windows, instead of having to type the
 command in each one.
-
-Furthermore, if we are concerned about using up available screen space,
-the above utilities allow one to have all the panes of a session in one
-physical space on the screen, switching between them on command.
 
 # To Learn More
 
