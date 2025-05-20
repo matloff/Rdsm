@@ -3,5 +3,5 @@ import(bigmemory,synchronicity)
 
 export(rthreadsSetup,rthreadsJoin,rthreadsAtomicInc,rthreadsAttachMutex,
    rthreadsAttachSharedVar,rthreadsMakeMutex,rthreadsMakeSharedVar,
-   rthreadsWaitDone)
+   rthreadsWaitDone,rthreadsMakeBarrier,rthreadsInitBarrier,rthreadsBarrier)
 
