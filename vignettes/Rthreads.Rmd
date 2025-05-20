@@ -1,4 +1,14 @@
-# Rthreads -- Threads for R!
+
+---
+title: "Rthreads -- Threads for R!"
+author: "Norm Matloff"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{My Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
 # Filling an Important Gap
 
