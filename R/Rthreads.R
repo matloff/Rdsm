@@ -173,7 +173,7 @@ rthreadsWaitDone <- function()
    while (nDone[1,1] < info$nThreads) {}
 }
 
-rthreadsBarrier <- function(returnCountSense=FALSE) 
+rthreadsBarrier <- function() 
 {
    mtx <- get('barrMutex0')
    barr <- get('barrier0')
@@ -184,11 +184,11 @@ rthreadsBarrier <- function(returnCountSense=FALSE)
       barr[1,1] <- info$nThreads
       barr[1,2] <- 1 - barr[1,2]
       unlock(mtx)
+      return()
    } else {
       barr[1,1] <- barr[1,1] - 1
       unlock(mtx)
       while (barr[1,2] == sense) {}
    }
-   if (returnCountSense) return(c(count,sense)) else return()
 }
 
