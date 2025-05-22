@@ -99,6 +99,12 @@
 
   Now call your application function code in each window.
 
+# Installation
+
+``` r
+devtools::install_github('https://github.com/matloff/Rthreads')
+```
+
 # Example 1
 
 We have a number of vectors, each to be sorted.
@@ -254,7 +260,7 @@ Here is the code:
 #    rthreadsSetup(nThreads=2)
 
 # algorithm assumes a Directed Acyclic Graph (DAG); for test cases, an
-# easy 
+# easy way is to run a causal discovery method
 
 setup <- function(preDAG,destVertex)  # run in "manager thread"
 {
@@ -337,6 +343,24 @@ findMinDists <- function()
 }
 
 ```
+
+As a test run, do
+
+``` r
+data(svcensus)
+setup(svcensus,3)
+```
+
+in the first window.  This generates a DAG for our test, and specifies
+that we are interested in vertex 3 as the destination, i.e. "B.".  Then
+run
+
+``` r
+findMinDists()
+```
+
+in all windows. Inspect **done[,]** to check the results; see
+description of that matrix below.
 
 A key property is that the k-th power of M tells us whether there is a
 k-link path from i to j, according to whether the row i, column j
