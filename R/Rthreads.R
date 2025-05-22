@@ -108,14 +108,14 @@ rthreadsJoin <- function(infoDir= '~')
 
 }
 # atomically increases sharedV by increm, returning old value;
-# sharedV is the name of a shared variable; element [1,1] is
-# incrememted
+# sharedV is the name of a shared variable; element [1,] is
+# incrememted; so, can have vector incrementing vector
 rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1) 
 {
    mtx <- get(mtx)
    lock(mtx)
    shrdv <- get(sharedV)
-   oldVal <- shrdv[1,1]
+   oldVal <- shrdv[1,]
    newVal <- oldVal + increm
    shrdv[1,1] <- newVal
    unlock(mtx)
@@ -178,15 +178,15 @@ rthreadsBarrier <- function()
    mtx <- get('barrMutex0')
    barr <- get('barrier0')
    lock(mtx)
-   count <- barr[1,1]
+   count <- barr[1,1] - 1
+   barr[1,1] <- count
    sense <- barr[1,2]
-   if (count == 1) {  # all done
+   if (count == 0) {  # all done
       barr[1,1] <- info$nThreads
       barr[1,2] <- 1 - barr[1,2]
       unlock(mtx)
       return()
    } else {
-      barr[1,1] <- barr[1,1] - 1
       unlock(mtx)
       while (barr[1,2] == sense) {}
    }

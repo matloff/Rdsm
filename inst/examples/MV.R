@@ -4,13 +4,13 @@
 
 setup <- function()  # run in "manager thread"
 {
-   load('../../data/LoansOpenIntro.RData')
-   loansOpenIntro <- factorsToDummies(loansOpenIntro,dfOut=FALSE)
-   loansOpenIntro <- loansOpenIntro[1:100,1:25]
-   z <- dim(loansOpenIntro)
+   data(NHISlarge)
+   nhis.large <- regtools::factorsToDummies(nhis.large,dfOut=FALSE)
+   nhis.large <- nhis.large[,-(1:4)]  # omit ID etc.
+   z <- dim(nhis.large)
    nr <- z[1]
    nc <- z[2]
-   rthreadsMakeSharedVar('dta',nr,nc,initVal=loansOpenIntro)
+   rthreadsMakeSharedVar('dta',nr,nc,initVal=nhis.large)
    rthreadsMakeSharedVar('totNumColsProcessed',1,1,initVal=0)
    rthreadsMakeSharedVar('nextColNum',1,1,initVal=1)
    rthreadsInitBarrier()
@@ -37,26 +37,26 @@ doImputation <- function(nToTriggerUpdate)
       NAelements <- which(is.na(dta[,myColNum]))
       if (length(NAelements) > 0) {
          lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
-         imputes <- lmOut$fitted.values
+         imputes <- lmOut$fitted.values[NAelements]
          myNumColsProcessed <- myNumColsProcessed + 1
          rthreadsAtomicInc('totNumColsProcessed')
          myImputes[[myNumColsProcessed]] <- 
-            list(myColNum=myColNum,imputes=imputes,NAelements=NAelements)
+            list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
          # note that this may leave "holes" in myImputes
       }
 
       # time to update data?
       if (totNumColsProcessed[1,1] > 0 &&
-          totNumColsProcessed[1,1] %% nToTriggerUpdate == 0) {
+          (totNumColsProcessed[1,1] %% nToTriggerUpdate == 0)) {
          rthreadsBarrier()  # can't change dta while possbily still in use
          if (length(myImputes) > 0) {
             for (i in 1:length(myImputes)) {
                colIinfo <- myImputes[[i]]
                if (!is.null(colIinfo)) {
-                  myColNum <- colIinfo$myColNum
+                  colNum <- colIinfo$colNum
                   NAelements <- colIinfo$NAelements
                   imputes <- colIinfo$imputes
-                  dta[NAelements,myColNum] <- imputes
+                  dta[NAelements,colNum] <- imputes
                }
             }
             myImputes <- list()
