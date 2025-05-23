@@ -5,16 +5,19 @@
 # NA imputation, simple use of linear regression, each column's NAs
 # replaced by fitted values
 
+# note that NA elements imputed in one column will be used as inputs to
+# imputation in later columns (after the curren "round"; see below)
+
 # mainly for illustrating barriers; could be made faster in various ways
+
+# for more of a computational-time challenge, try say k-NN instead of
+# linear regresion
 
 setup <- function()  # run in "manager thread"
 {
    data(NHISlarge)
    nhis.large <- regtools::factorsToDummies(nhis.large,dfOut=FALSE)
    nhis.large <- nhis.large[,-(1:4)]  # omit ID etc.
-   # make a small version for testing
-   nhis.large <- nhis.large[1:25,]
-   print(nhis.large)
    z <- dim(nhis.large)
    nr <- z[1]
    nc <- z[2]
@@ -38,7 +41,6 @@ doImputation <- function()
 
       myColNum <- (i-1)*numPerRound + myID + 1
    
-      # determine which is this thread's column, and 
       # impute this column, if needed
       myImputes <- NULL
       if (myColNum <= nc) {
