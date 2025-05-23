@@ -105,7 +105,7 @@
 devtools::install_github('https://github.com/matloff/Rthreads')
 ```
 
-# Example 1
+# Example 1: Sorting many long vectors
 
 We have a number of vectors, each to be sorted.
 
@@ -491,6 +491,178 @@ we would need to reset that variable to 1. But we would need to
 ascertain that all threads are indeed done with that iteration, and a
 barrier would accomplish that goal.
 
+# Example 3: Missing value imputation
+
+Here the application is imputation of NAs in a large dataset. Note that
+I've kept it simple, so as to best illustrate the parallelization
+principles involved; it is neither an optimal way to do imputation nor
+an optimally speedy parallelization of the given imputation problem.
+
+We have a large data frame with numerical entries, but with NA values
+here and there. A common imputation approach for a given column is to run
+some kind of regression method (parametric or nonparametric) to predict
+this column from the others, then replace the NAs by the predicted
+values.
+
+We will do this column by column, with each thread temporarily saving
+its imputed values rather than writing them back to the dataset. Only
+after all threads have computed imputations in the given round do we
+update the actual dataset. Since we are working column by column, this
+means earlier imputations can be employed in the regression actions of
+later columns, hopefully improving imputation accuracy. (Again, this may
+or may not be the case, but that is the motivation behind the imputation
+algorithm.) See comments in the code for further discussion.
+
+Here is the code:
+
+``` r
+# threads configuration: run
+#    rthreadsSetup(nThreads=2)
+
+# NA imputation, simple use of linear regression, each column's NAs
+# replaced by fitted values
+
+# note that NA elements imputed in one column will be used as inputs to
+# imputation in later columns (after the curren "round"; see below)
+
+# mainly for illustrating barriers; could be made faster in various ways
+
+# for more of a computational-time challenge, try say k-NN instead of
+# linear regresion
+
+setup <- function()  # run in "manager thread"
+{
+   data(NHISlarge)
+   nhis.large <- regtools::factorsToDummies(nhis.large,dfOut=FALSE)
+   nhis.large <- nhis.large[,-(1:4)]  # omit ID etc.
+   z <- dim(nhis.large)
+   nr <- z[1]
+   nc <- z[2]
+   rthreadsMakeSharedVar('dta',nr,nc,initVal=nhis.large)
+   rthreadsInitBarrier()
+}
+
+doImputation <- function()  
+{
+   if (myID > 0) {
+      rthreadsAttachSharedVar('dta')
+   }
+   nc <- ncol(dta)
+   nThreads <- info$nThreads
+
+   # in each round, each thread works on one column; they then update
+   # the data
+   nRounds <- ceiling(nc/nThreads)
+   numPerRound <- floor(nc/nRounds)
+   for (i in 1:nRounds) {
+
+      myColNum <- (i-1)*numPerRound + myID + 1
+   
+      # impute this column, if needed
+      myImputes <- NULL
+      if (myColNum <= nc) {
+         print(myColNum)
+         NAelements <- which(is.na(dta[,myColNum]))
+         if (length(NAelements) > 0) {
+            lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
+            # note: if a row has more than 1 NA, imputed value 
+            # will still be NA
+            imputes <- lmOut$fitted.values[NAelements]
+            myImputes <- 
+               list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
+         }
+      }
+
+      # update data, where needed
+      rthreadsBarrier()  # can't change dta while possbily still in use
+
+      if (!is.null(myImputes)) {
+         colNum <- myImputes$colNum
+         NAelements <- myImputes$NAelements
+         imputes <- myImputes$imputes
+         dta[NAelements,colNum] <- imputes
+      }
+
+      rthreadsBarrier()  # some threads may still be writing to dta
+
+   }
+
+}
+
+```
+
+To run the code, first run **setup** in one window, then **doImputation**
+in all windows. The shared object **dta** contains the dataset
+throughout the code, and upon completion the
+imputed dataset will there.
+
+Work is done on groups of columns, called "rounds" here.
+
+``` r
+nc <- ncol(dta)
+...
+nRounds <- ceiling(nc/nThreads)
+numPerRound <- floor(nc/nRounds)
+for (i in 1:nRounds) {
+```
+
+Within a round, each thread checks its assigned column for NAs, and
+performs the imputation (if any) in **myImputes**:
+
+``` r
+myImputes <- NULL
+if (myColNum <= nc) {
+   ...
+   NAelements <- which(is.na(dta[,myColNum]))
+   if (length(NAelements) > 0) {
+      lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
+      imputes <- lmOut$fitted.values[NAelements]
+      myImputes <- 
+         list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
+   }
+}
+```
+
+At the end of a round, each thread will update the dataset with the
+imputations it found. However, it must first make sure all threads are
+done with their imputation processes; otherwise, this thread might write
+to some data while another thread is still using the old version of the
+dataset. This is accomplished by the barrier operation:
+
+``` r
+      ...
+      imputes <- lmOut$fitted.values[NAelements]
+      myImputes <- 
+         list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
+   }
+}
+
+rthreadsBarrier()  
+```
+
+Similarly, before then going on to the next round, we must make sure all
+threads are done with their update operations, thus another barrier:
+
+``` r
+if (!is.null(myImputes)) {
+   colNum <- myImputes$colNum
+   NAelements <- myImputes$NAelements
+   imputes <- myImputes$imputes
+   dta[NAelements,colNum] <- imputes
+}
+
+rthreadsBarrier()  
+``
+
+# Regarding Repeat Runs
+
+Objects created by **bigmemory** are persistent until removed or until
+the R session ends. This can have implications if you do a number of
+runs of an **Rthreads** application. Be sure your application's **setup**
+function re-initializes **bigmemory** objects as needed.
+
+Note too that **myID** and **info** are also persitent.
+
 # Facilitating Rthreads Use via 'screen' or 'tmux'
 
 In using **Rthreads**, one needs a separate terminal window for each
@@ -530,3 +702,9 @@ command in each one.
 With Examples in R, C++ and CUDA*](https://www.google.com/books/edition/Parallel_Computing_for_Data_Science/SsbECQAAQBAJ?hl=en&gbpv=0)
 
 * [Tutorial on accessing OpenMP via **Rcpp**](https://mfasiolo.github.io/sc2-2019/rcpp_advanced_iii/1_openmp/)
+
+# Legal
+
+Freely copyable providing attribution is given. No warranty is given of
+any kind.
+
