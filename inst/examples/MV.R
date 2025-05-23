@@ -1,72 +1,72 @@
 
 # threads configuration: run
-# rthreadsSetup(nThreads=2)
+#    rthreadsSetup(nThreads=2)
+
+# NA imputation, simple use of linear regression, each column's NAs
+# replaced by fitted values
+
+# mainly for illustrating barriers; could be made faster in various ways
 
 setup <- function()  # run in "manager thread"
 {
    data(NHISlarge)
    nhis.large <- regtools::factorsToDummies(nhis.large,dfOut=FALSE)
    nhis.large <- nhis.large[,-(1:4)]  # omit ID etc.
+   # make a small version for testing
+   nhis.large <- nhis.large[1:25,]
+   print(nhis.large)
    z <- dim(nhis.large)
    nr <- z[1]
    nc <- z[2]
    rthreadsMakeSharedVar('dta',nr,nc,initVal=nhis.large)
-   rthreadsMakeSharedVar('totNumColsProcessed',1,1,initVal=0)
-   rthreadsMakeSharedVar('nextColNum',1,1,initVal=1)
    rthreadsInitBarrier()
 }
 
-doImputation <- function(nToTriggerUpdate)  
+doImputation <- function()  
 {
-   myColNum <- myID+1  
-   myNumColsProcessed <- 0
-   myImputes <- list()
    if (myID > 0) {
       rthreadsAttachSharedVar('dta')
-      rthreadsAttachSharedVar('totNumColsProcessed')
-      rthreadsAttachSharedVar('nextColNum')
    }
+   nc <- ncol(dta)
+   nThreads <- info$nThreads
 
-   while (myColNum <= ncol(dta)) {
+   # in each round, each thread works on one column; they then update
+   # the data
+   nRounds <- ceiling(nc/nThreads)
+   numPerRound <- floor(nc/nRounds)
+   for (i in 1:nRounds) {
 
-      # as illustration of parallel operation, see which threads impute
-      # which columns
-      print(myColNum)
-
+      myColNum <- (i-1)*numPerRound + myID + 1
+   
+      # determine which is this thread's column, and 
       # impute this column, if needed
-      NAelements <- which(is.na(dta[,myColNum]))
-      if (length(NAelements) > 0) {
-         lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
-         imputes <- lmOut$fitted.values[NAelements]
-         myNumColsProcessed <- myNumColsProcessed + 1
-         rthreadsAtomicInc('totNumColsProcessed')
-         myImputes[[myNumColsProcessed]] <- 
-            list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
-         # note that this may leave "holes" in myImputes
-      }
-
-      # time to update data?
-      if (totNumColsProcessed[1,1] > 0 &&
-          (totNumColsProcessed[1,1] %% nToTriggerUpdate == 0)) {
-         rthreadsBarrier()  # can't change dta while possbily still in use
-         if (length(myImputes) > 0) {
-            for (i in 1:length(myImputes)) {
-               colIinfo <- myImputes[[i]]
-               if (!is.null(colIinfo)) {
-                  colNum <- colIinfo$colNum
-                  NAelements <- colIinfo$NAelements
-                  imputes <- colIinfo$imputes
-                  dta[NAelements,colNum] <- imputes
-               }
-            }
-            myImputes <- list()
+      myImputes <- NULL
+      if (myColNum <= nc) {
+         print(myColNum)
+         NAelements <- which(is.na(dta[,myColNum]))
+         if (length(NAelements) > 0) {
+            lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
+            # note: if a row has more than 1 NA, imputed value 
+            # will still be NA
+            imputes <- lmOut$fitted.values[NAelements]
+            myImputes <- 
+               list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
          }
-         rthreadsBarrier()  # some threads may still be writing to dta
       }
 
-      myColNum <- rthreadsAtomicInc('nextColNum')
-   }
+      # update data, where needed
+      rthreadsBarrier()  # can't change dta while possbily still in use
 
-   rthreadsBarrier()
+      if (!is.null(myImputes)) {
+         colNum <- myImputes$colNum
+         NAelements <- myImputes$NAelements
+         imputes <- myImputes$imputes
+         dta[NAelements,colNum] <- imputes
+      }
+
+      rthreadsBarrier()  # some threads may still be writing to dta
+
+   }
 
 }
+
