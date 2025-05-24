@@ -10,7 +10,8 @@
 * R does not have native threading.
 
 * Lack of threading in R means that developers of fast packages 
-  like **data.table** must rely on threads at the C++ level.
+  like **data.table** must rely on threads at the C++ level (and
+  only implementing specific functions).
 
 * Alternative to threads is *message-passing*, e.g. R's **parallel**
   package, including via **foreach** interface.
@@ -24,7 +25,7 @@
 # What Is the Difference between Threading and Message Passing?
 
 * Say we are on a quad-core machine. Here is an overview of the two
-  paradigms (lots of variants, not covered here):
+  paradigms (lots of variants):
 
 * Message passing:
 
@@ -62,7 +63,7 @@
     copy of **x** but 4 copies of **y**.
 
   * By the way, what about Python? It does have threading capability,
-    but has always useless for parallel computation, as its *Global
+    but has always been useless for parallel computation, as its *Global
     Interpreter Lock* disallows more than one thread running at a time.
     However, the newest version of Python has an experimental GIL-less
     option.
@@ -152,29 +153,35 @@ To run, say with just 2 threads:
 
 1. Let's refer to the 2 terminal windows as W1 and W2.
 
-2. In W1, run
+2. Start **Rthreads**: 
 
-``` r
-rthreadsSetup(nThreads=2,
-   sharedVars=list(nextRowNum=c(1,1,3),m=c(10,100000000)))
-```
+   In W1, run
 
-This sets up 2 threads (running in the 2 windows), and 2 shared
-variables: **nextRowNum**, a scalar, and **m**, the latter being our
-matrix of rows to be sorted, 10 rows of length 100000000 each.
+   ``` r
+   rthreadsSetup(nThreads=2,
+      sharedVars=list(nextRowNum=c(1,1,3),m=c(10,100000000)))
+   ```
 
-3. In both windows, run
+   This sets up 2 threads (running in the 2 windows), and 2 shared
+   variables: **nextRowNum**, a scalar, and **m**, the latter being our
+   matrix of rows to be sorted, 10 rows of length 100000000 each.
 
-```r 
-rthreadsJoin()
-```
+   In both windows, run
 
-Here each thread "checks in," attaches the shared variables, sets its
-ID, and then waits until all the threads have joined.
+   ```r 
+   rthreadsJoin()
+   ```
 
-4. In W1, run **setup()** to generate the data.
+   Here each thread "checks in," attaches the shared variables, sets its
+   ID, and then waits until all the threads have joined.
 
-5. In both W1 and W2, run **doSorts()** to do the sorting.
+6. Set up and run app: 
+
+   In W1, run **setup()** to generate the data.
+
+   In both W1 and W2, run **doSorts()** to do the sorting.
+
+   Sorted rows are now available in **m**.
 
 Overview of the code:
 
@@ -383,7 +390,7 @@ given destination B, which is **destVertex** in the code. We will store
 results in the shared matrix **done**, and in fact that object will
 contain the final results in the end. If row i in **done** has value
 (r,s), it means that in iteration r our search for paths from i to the
-destination ended in iteration i. If s = 1, that means the destination
+destination ended. If s = 1, that means the destination
 was reached in a path of r links; if s = 2, it is impossible to get from
 i to the destination.
 
@@ -505,13 +512,15 @@ this column from the others, then replace the NAs by the predicted
 values.
 
 We will do this column by column, with each thread temporarily saving
-its imputed values rather than writing them back to the dataset. Only
-after all threads have computed imputations in the given round do we
-update the actual dataset. Since we are working column by column, this
-means earlier imputations can be employed in the regression actions of
-later columns, hopefully improving imputation accuracy. (Again, this may
-or may not be the case, but that is the motivation behind the imputation
-algorithm.) See comments in the code for further discussion.
+its imputed values temporarily rather than immediately writing them back
+to the dataset. Only after all threads have computed imputations in the
+given round do we update the actual dataset. 
+
+Since we are working column by column, this means earlier imputations
+can be employed in the regression actions of later columns, hopefully
+improving imputation accuracy. (Again, this may or may not be the case,
+but that is the motivation behind the imputation algorithm.) See
+comments in the code for further discussion.
 
 Here is the code:
 
@@ -626,7 +635,7 @@ if (myColNum <= nc) {
 At the end of a round, each thread will update the dataset with the
 imputations it found. However, it must first make sure all threads are
 done with their imputation processes; otherwise, this thread might write
-to some data while another thread is still using the old version of the
+to the dataset while another thread is still using the old version of the
 dataset. This is accomplished by the barrier operation:
 
 ``` r
@@ -640,8 +649,9 @@ dataset. This is accomplished by the barrier operation:
 rthreadsBarrier()  
 ```
 
-Similarly, before then going on to the next round, we must make sure all
-threads are done with their update operations, thus another barrier:
+Similarly, after performing the update and going on to the next round,
+we must make sure all threads are done with their update operations,
+thus another barrier:
 
 ``` r
 if (!is.null(myImputes)) {
@@ -652,7 +662,7 @@ if (!is.null(myImputes)) {
 }
 
 rthreadsBarrier()  
-``
+```
 
 # Regarding Repeat Runs
 
@@ -661,7 +671,7 @@ the R session ends. This can have implications if you do a number of
 runs of an **Rthreads** application. Be sure your application's **setup**
 function re-initializes **bigmemory** objects as needed.
 
-Note too that **myID** and **info** are also persitent.
+Note too that **myID** and **info** are also persistent.
 
 # Facilitating Rthreads Use via 'screen' or 'tmux'
 
