@@ -168,7 +168,7 @@ To run, say with just 2 threads:
 
    In both windows, run
 
-   ```r 
+   ``` r 
    rthreadsJoin()
    ```
 
