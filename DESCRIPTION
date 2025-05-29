@@ -2,7 +2,7 @@ Package: Rthreads
 Version: 1.0.1
 Author: Norm Matloff <normmatloff@gmail.com>
 Maintainer: Norm Matloff <normmatloff@gmail.com>
-Date: 05/19/2025
+Date: 2025-05-29
 Title: Parallel Threads Environment for R
 Description: Provides a threads-type parallel programming environment for R.
    The package gives the R programmer the clearer, more concise

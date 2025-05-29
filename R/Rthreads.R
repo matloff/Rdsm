@@ -78,7 +78,8 @@ rthreadsJoin <- function(infoDir= '~')
    load(infoFile)
    assign('info',info,envir = .GlobalEnv); rm(info)
    infoDir <- info$infoDir
-   mgrThread <- exists('myID') && myID == 0
+   tmp <- get0('myID',envir = .GlobalEnv)
+   mgrThread <- !is.null(tmp) && myID == 0
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir='~/')
       rthreadsAttachSharedVar('nDone',infoDir='~/')
@@ -125,10 +126,15 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
 rthreadsMakeBarrier <- function()
 {
    rthreadsMakeMutex('barrMutex0')
+   get('info',envir = .GlobalEnv)
    rthreadsMakeSharedVar('barrier0',1,2,initVal=c(info$nThreads,0))
 }
 
-rthreadsInitBarrier <- function() barrier0[1,] <- c(info$nThreads,0)
+rthreadsInitBarrier <- function() 
+{
+   get('info',envir = .GlobalEnv)
+   barrier0[1,] <- c(info$nThreads,0)
+}
 
 # create a variable shareable across threads
 rthreadsMakeSharedVar <- function(varName,nr,nc,infoDir='~/',initVal=NULL) 
@@ -170,6 +176,7 @@ rthreadsAttachMutex <- function(mutexName,infoDir='~/')
 rthreadsWaitDone <- function() 
 {
    rthreadsAtomicInc('nDone')
+   get('info',envir = .GlobalEnv)
    while (nDone[1,1] < info$nThreads) {}
 }
 
@@ -182,6 +189,7 @@ rthreadsBarrier <- function()
    barr[1,1] <- count
    sense <- barr[1,2]
    if (count == 0) {  # all done
+      get('info',envir = .GlobalEnv)
       barr[1,1] <- info$nThreads
       barr[1,2] <- 1 - barr[1,2]
       unlock(mtx)
