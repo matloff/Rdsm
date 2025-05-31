@@ -104,7 +104,7 @@ rthreadsJoin <- function(infoDir= '~')
    mutexNames <- info$mutexNames
    if (!is.null(mutexNames)) {
       for (i in 1:length(mutexNames)) 
-         rthreadsAttachSharedMutex(mutexNames[i],infoDir='~/')
+         rthreadsAttachMutex(mutexNames[i],infoDir='~/')
    }
 
    # wait for everyone else
