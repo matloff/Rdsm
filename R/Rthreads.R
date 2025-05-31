@@ -14,6 +14,8 @@ require(synchronicity)
 #    the list values could be more than 2-tuples, having lengths
 #    3 or more; the function rthreadsSetup handles the
 #    case of length 3
+   
+utils::globalVariables(c('info','myID','nDone','nJoined'))
 
 rthreadsSetup <- function(
    nThreads,  # number of threads
@@ -80,6 +82,7 @@ rthreadsJoin <- function(infoDir= '~')
    infoDir <- info$infoDir
    tmp <- get0('myID',envir = .GlobalEnv)
    mgrThread <- !is.null(tmp) && myID == 0
+   ### mgrThread <- exists('myID') && myID == 0
    if (!mgrThread) {
       rthreadsAttachSharedVar('nJoined',infoDir='~/')
       rthreadsAttachSharedVar('nDone',infoDir='~/')

@@ -44,6 +44,7 @@ rthreadsMakeMutex(mutexName,infoDir='~/')
   \item{nr}{Number of rows.}
   \item{nc}{Number of columns.}
   \item{mutexName}{Quoted name.}
+  \item{initVal}{Initial value of shared variable.}
 }
 
 \details{
