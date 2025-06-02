@@ -1,7 +1,6 @@
 \name{Rthreads}
 \alias{rthreadsSetup}
 \alias{rthreadsAtomicInc}
-\alias{rthreadsAttachSharedVar}
 \alias{rthreadsInitBarrier}
 \alias{rthreadsMakeBarrier}
 \alias{rthreadsMakeSharedVar}
@@ -24,7 +23,7 @@ rthreadsAtomicInc(sharedV,mtx='mutex0',increm=1)
 rthreadsAttachSharedVar(varName,infoDir='~/')
 rthreadsInitBarrier()
 rthreadsMakeBarrier()
-rthreadsMakeSharedVariable(varName,nr,nc,infoDir='~/',initVal=NULL)
+rthreadsMakeSharedVar(varName,nr,nc,infoDir='~/',initVal=NULL)
 rthreadsWaitDone()
 rthreadsAttachMutex(mutexName,infoDir='~/')
 rthreadsBarrier()
