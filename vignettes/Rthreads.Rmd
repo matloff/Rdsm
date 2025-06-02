@@ -5,7 +5,7 @@ author: "Norm Matloff"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{My Vignette Title}
+  %\VignetteIndexEntry{Rthreads}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

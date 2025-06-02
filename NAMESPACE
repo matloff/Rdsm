@@ -1,5 +1,5 @@
 
-import(bigmemory,synchronicity,parallel)
+import(bigmemory,parallel)
 
 export(rthreadsSetup,rthreadsJoin,rthreadsAtomicInc,rthreadsAttachMutex,
    rthreadsAttachSharedVar,rthreadsMakeMutex,rthreadsMakeSharedVar,
