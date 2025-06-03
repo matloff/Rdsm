@@ -18,7 +18,7 @@ setup <- function()  # run in "manager thread"
 doSorts <- function()  # run in all threads, maybe with system.time()
 {
 
-   rowNum <- myID+1  # my first vector to sort
+   rowNum <- myGlobals$myID+1  # my first vector to sort
 
    while (rowNum <= nrow(m)) {
       # as illustration of parallel operation, see which threads execute
