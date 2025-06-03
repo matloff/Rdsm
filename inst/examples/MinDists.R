@@ -28,7 +28,8 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
 findMinDists <- function()  
    # run in all threads, maybe with system.time()
 {
-   if (myID > 0) {
+   ### if (myID > 0) {
+   if (myGlobals$myID > 0) {
       rthreadsAttachSharedVar('adjm')
       rthreadsAttachSharedVar('adjmPow')
       rthreadsAttachSharedVar('done')
@@ -37,7 +38,7 @@ findMinDists <- function()
    } 
    destVertex <- dstVrtx[1,1]
    n <- nrow(adjm[,])
-   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+   myRows <- parallel::splitIndices(n,info$nThreads)[[myGlobals$myID+1]]
    mySubmatrix <- adjm[myRows,]
 
    # find "dead ends," vertices to lead nowhere

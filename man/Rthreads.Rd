@@ -4,6 +4,7 @@
 \alias{rthreadsInitBarrier}
 \alias{rthreadsMakeBarrier}
 \alias{rthreadsMakeSharedVar}
+\alias{rthreadsAttachSharedVar}
 \alias{rthreadsWaitDone}
 \alias{rthreadsAttachMutex}
 \alias{rthreadsBarrier}
