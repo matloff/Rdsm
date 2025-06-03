@@ -1,6 +1,6 @@
 
 ---
-title: "Rthreads -- Threads for R!"
+title: "Rthreads"
 author: "Norm Matloff"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
