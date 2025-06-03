@@ -27,7 +27,7 @@ setup <- function()  # run in "manager thread"
 
 doImputation <- function()  
 {
-   if (myID > 0) {
+   if (myGlobals$myID > 0) {
       rthreadsAttachSharedVar('dta')
    }
    nc <- ncol(dta)
@@ -39,7 +39,7 @@ doImputation <- function()
    numPerRound <- floor(nc/nRounds)
    for (i in 1:nRounds) {
 
-      myColNum <- (i-1)*numPerRound + myID + 1
+      myColNum <- (i-1)*numPerRound + myGlobals$myID + 1
    
       # impute this column, if needed
       myImputes <- NULL
