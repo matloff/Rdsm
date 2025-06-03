@@ -117,12 +117,12 @@ rthreadsJoin <- function(infoDir= '~')
 rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1) 
 {
    mtx <- get(mtx)
-   lock(mtx)
+   synchronicity::lock(mtx)
    shrdv <- get(sharedV)
    oldVal <- shrdv[1,]
    newVal <- oldVal + increm
    shrdv[1,1] <- newVal
-   unlock(mtx)
+   synchronicity::unlock(mtx)
    return(oldVal)
 }
 
@@ -187,7 +187,7 @@ rthreadsBarrier <- function()
 {
    mtx <- get('barrMutex0')
    barr <- get('barrier0')
-   lock(mtx)
+   synchronicity::lock(mtx)
    count <- barr[1,1] - 1
    barr[1,1] <- count
    sense <- barr[1,2]
@@ -195,10 +195,10 @@ rthreadsBarrier <- function()
       get('info',envir = .GlobalEnv)
       barr[1,1] <- info$nThreads
       barr[1,2] <- 1 - barr[1,2]
-      unlock(mtx)
+      synchronicity::unlock(mtx)
       return()
    } else {
-      unlock(mtx)
+      synchronicity::unlock(mtx)
       while (barr[1,2] == sense) {}
    }
 }
