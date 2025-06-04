@@ -21,6 +21,7 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
    rthreadsMakeSharedVar('imDone',1,1,initVal=0)
    rthreadsMakeSharedVar('NDone',1,1,initVal=0)
    rthreadsMakeSharedVar('dstVrtx',1,1,initVal=destVertex)
+   rthreadsMakeSharedVar('nextRowNum',1,1,initVal=0)
    rthreadsInitBarrier()
    return()
 }
@@ -28,8 +29,7 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
 findMinDists <- function()  
    # run in all threads, maybe with system.time()
 {
-   ### if (myID > 0) {
-   if (myGlobals$myID > 0) {
+   if (myID > 0) {
       rthreadsAttachSharedVar('adjm')
       rthreadsAttachSharedVar('adjmPow')
       rthreadsAttachSharedVar('done')
@@ -38,8 +38,8 @@ findMinDists <- function()
    } 
    destVertex <- dstVrtx[1,1]
    n <- nrow(adjm[,])
-   myRows <- parallel::splitIndices(n,myGlobals$info$nThreads)[[myGlobals$myID+1]]
-   mySubmatrix <- adjm[myRows,]
+   ## myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
+   ## mySubmatrix <- adjm[myRows,]
 
    # find "dead ends," vertices to lead nowhere
    tmp <- rowSums(adjm[,])
@@ -50,14 +50,19 @@ findMinDists <- function()
    done[destVertex,] <- c(1,2)
    deadEndsPlusDV <- c(deadEnds,destVertex)
 
+   myRow <- rthreadsAtomicInc('nextRowNum') + 1
+
    imDone <- FALSE
    for (iter in 1:(n-1)) {
       rthreadsBarrier()
-      if (NDone[1,1] == myGlobals$info$nThreads) return()
+      if (sum(done[,1] == 0) == 0) return()
+      ## if (NDone[1,1] == info$nThreads) return()
       if (iter > 1 && (iter <= n-1))
-         adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
-      if (!imDone) {
-         for (myRow in setdiff(myRows,deadEndsPlusDV)) {
+         ## adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+         adjmPow[myRow,] <- adjmPow[myRow,] %*% adjm[,]
+      ## if (!imDone) {
+         ## for (myRow in setdiff(myRows,deadEndsPlusDV)) {
+         if (myRow in setdiff(1:n,deadEndsPlusDV)) {
             if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
                if (adjmPow[myRow,destVertex] > 0) {
                   done[myRow,1] <- iter
@@ -75,11 +80,11 @@ findMinDists <- function()
                }
             }
          }
-         if (sum(done[myRows,1] == 0) == 0) {
-            imDone <- TRUE
-            rthreadsAtomicInc('NDone')
-         }
-      }
+         ## if (sum(done[myRows,1] == 0) == 0) {
+         ##    imDone <- TRUE
+         ##    rthreadsAtomicInc('NDone')
+         ## }
+      ## }
    }
 
 }

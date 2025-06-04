@@ -15,8 +15,6 @@ require(synchronicity)
 #    3 or more; the function rthreadsSetup handles the
 #    case of length 3
    
-utils::globalVariables(c('info','myID','nDone','nJoined'))
-
 rthreadsSetup <- function(
    nThreads,  # number of threads
    sharedVars = NULL,  # see above
@@ -24,15 +22,30 @@ rthreadsSetup <- function(
    infoDir = '~/'
 ) 
 {
-   assign('info',
-      list(
-         nThreads = nThreads,
-         infoDir = infoDir,
-         sharedVarNames = NULL,
-         mutexNames = mutexNames
-      ),envir = .GlobalEnv)
+
+   info <- list(
+              nThreads = nThreads,
+              infoDir = infoDir,
+              sharedVarNames = NULL,
+              mutexNames = mutexNames
+           )
 
    infoFile = paste0(infoDir,'rthreadsInfo.RData')
+
+   ### assign('myID',0,envir = .GlobalEnv)
+   tmp <- new.env()
+   assign('myGlobals',tmp,envir = .GlobalEnv)
+   myGlobals$myID <- 0
+   myGlobals$info <- info
+   save(info,file=infoFile)
+
+###    assign('info',
+###       list(
+###          nThreads = nThreads,
+###          infoDir = infoDir,
+###          sharedVarNames = NULL,
+###          mutexNames = mutexNames
+###       ),envir = .GlobalEnv)
 
    rthreadsMakeMutex('mutex0',infoDir='~/')
    rthreadsMakeBarrier()
@@ -51,28 +64,23 @@ rthreadsSetup <- function(
             rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],
                infoDir='~/', initVal=nrowcoletc[3])
          }
-         info$sharedVarNames <- c(info$sharedVarNames,varName)
+         myGlobals$info$sharedVarNames <- 
+            c(myGlobals$info$sharedVarNames,varName)
       }
    }
 
    # set up the application-specific mutexes
-   mutexNames <- info$mutexNames
+   mutexNames <- myGlobals$info$mutexNames
    if (!is.null(mutexNames)) {
-      for (i in 1:length(info$mutexNames)) {
-         mtxname <- info$mutexNames[i]
+      for (i in 1:length(myGlobals$info$mutexNames)) {
+         mtxname <- myGlobals$info$mutexNames[i]
          tmp <- boost.mutex(mtxname)
          desc <- describe(tmp)
          descFile <- paste0(infoDir,mtxname,'.desc')
          dput(desc,file=descFile)
-         info$mutexNames <- c(info$mutexNames,descFile)
+         myGlobals$info$mutexNames <- c(myGlobals$info$mutexNames,descFile)
       }
    }
-
-   save(info,file=infoFile)
-   ### assign('myID',0,envir = .GlobalEnv)
-   tmp <- new.env()
-   assign('myGlobals',tmp,envir = .GlobalEnv)
-   myGlobals$myID <- 0
    
 }
 
@@ -82,13 +90,11 @@ rthreadsJoin <- function(infoDir= '~')
    # check in and get my ID
    infoFile = paste0(infoDir,'/rthreadsInfo.RData')
    load(infoFile)
-   assign('info',info,envir = .GlobalEnv); rm(info)
-   infoDir <- info$infoDir
-   ### tmp <- get0('myID',envir = .GlobalEnv)
-   ### mgrThread <- !is.null(tmp) && myID == 0
+   ### assign('info',info,envir = .GlobalEnv); rm(info)
    tmp <- get0('myGlobals',envir = .GlobalEnv)
    mgrThread <- !is.null(tmp) && myGlobals$myID == 0
    if (!mgrThread) {
+      ### myGlobals$info <- info
       rthreadsAttachSharedVar('nJoined',infoDir='~/')
       rthreadsAttachSharedVar('nDone',infoDir='~/')
       rthreadsAttachMutex('mutex0',infoDir='~/')
@@ -99,9 +105,10 @@ rthreadsJoin <- function(infoDir= '~')
       tmp <- new.env()
       assign('myGlobals',tmp,envir = .GlobalEnv)
       myGlobals$myID <- nj
+      myGlobals$info <- info
    }
    # pick up the shared variables
-   sharedVarNames <- info$sharedVarNames
+   sharedVarNames <- myGlobals$info$sharedVarNames
    if (!is.null(sharedVarNames)) {
       for (i in 1:length(sharedVarNames)) {
          rthreadsAttachSharedVar(sharedVarNames[i],infoDir='~/')
@@ -109,14 +116,14 @@ rthreadsJoin <- function(infoDir= '~')
    }
    
    # pick up the application-specific mutexes
-   mutexNames <- info$mutexNames
+   mutexNames <- myGlobals$info$mutexNames
    if (!is.null(mutexNames)) {
       for (i in 1:length(mutexNames)) 
          rthreadsAttachMutex(mutexNames[i],infoDir='~/')
    }
 
    # wait for everyone else
-   while (nJoined[1,1] < info$nThreads) {}
+   while (nJoined[1,1] < myGlobals$info$nThreads) {}
 
 }
 # atomically increases sharedV by increm, returning old value;
@@ -137,14 +144,14 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
 rthreadsMakeBarrier <- function()
 {
    rthreadsMakeMutex('barrMutex0')
-   get('info',envir = .GlobalEnv)
-   rthreadsMakeSharedVar('barrier0',1,2,initVal=c(info$nThreads,0))
+   ### get('info',envir = .GlobalEnv)
+   rthreadsMakeSharedVar('barrier0',1,2,initVal=c(myGlobals$info$nThreads,0))
 }
 
 rthreadsInitBarrier <- function() 
 {
-   get('info',envir = .GlobalEnv)
-   barrier0[1,] <- c(info$nThreads,0)
+   ### get('info',envir = .GlobalEnv)
+   barrier0[1,] <- c(myGlobals$info$nThreads,0)
 }
 
 # create a variable shareable across threads
@@ -187,8 +194,8 @@ rthreadsAttachMutex <- function(mutexName,infoDir='~/')
 rthreadsWaitDone <- function() 
 {
    rthreadsAtomicInc('nDone')
-   get('info',envir = .GlobalEnv)
-   while (nDone[1,1] < info$nThreads) {}
+   ### get('info',envir = .GlobalEnv)
+   while (nDone[1,1] < myGlobals$info$nThreads) {}
 }
 
 rthreadsBarrier <- function() 
@@ -200,8 +207,8 @@ rthreadsBarrier <- function()
    barr[1,1] <- count
    sense <- barr[1,2]
    if (count == 0) {  # all done
-      get('info',envir = .GlobalEnv)
-      barr[1,1] <- info$nThreads
+      ### get('info',envir = .GlobalEnv)
+      barr[1,1] <- myGlobals$info$nThreads
       barr[1,2] <- 1 - barr[1,2]
       synchronicity::unlock(mtx)
       return()
