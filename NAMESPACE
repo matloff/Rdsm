@@ -6,3 +6,5 @@ export(rthreadsSetup,rthreadsJoin,rthreadsAtomicInc,rthreadsAttachMutex,
    rthreadsWaitDone,rthreadsMakeBarrier,rthreadsInitBarrier,rthreadsBarrier,
    quickstart)
 
+importFrom("utils", "browseURL")
+
