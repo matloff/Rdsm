@@ -196,3 +196,7 @@ rthreadsBarrier <- function()
    }
 }
 
+quickstart <- function() 
+{
+   browseURL(system.file("doc", "QuickStart.pdf", package = "Rthreads"))
+}
