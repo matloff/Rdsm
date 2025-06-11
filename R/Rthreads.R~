@@ -40,7 +40,7 @@ rthreadsSetup <- function(
       for (i in 1:length(sharedVars)) {
          varName <- names(sharedVars)[i]
          nrowcoletc <- sharedVars[[i]]
-         if (length(nrowcoletc) == 2) {
+         if (length(nrowcoletc) == 3) {
             rthreadsMakeSharedVar(varName,nrowcoletc[1],nrowcoletc[2],
                infoDir='~/')
          } else {

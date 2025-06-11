@@ -72,7 +72,12 @@
 
 * True physical shared RAM, via **bigmemory** package.
 
+* 100% R; no C/C++ code to compile.
+
 * Parallel computation under the shared-memory paradigm.
+
+* Coding style and performance essentially equivalent to
+  that of "threaded R" if it were to exist.
 
 * Each thread is a separate instance of R.
 
@@ -80,7 +85,7 @@
 
 # How Rthreads Works
 
-* The sole data type is matrix, a **bigmemory** constraint. this must be
+* The sole data type is matrix, a **bigmemory** constraint. A matrix  must be
   explicitly written with two (possibly empty) subscripts,
   e.g. **x[3,2]**, **x[,1:5]**, **x[,]**.
 
@@ -100,18 +105,76 @@
 
   Now call your application function code in each window.
 
+* Some in the computing field believe that one should avoid
+  having global variables. However, globals are the essence of
+  threading. In R, the generally accepted implementation of globals 
+  is to place them in an R environment, which we do here:
+
+  * Shared variables are in the environment **sharedGlobals**.
+
+  * No-shared variables are in the environment **myGlobals**.
+
 # Installation
 
 ``` r
 devtools::install_github('https://github.com/matloff/Rthreads')
 ```
 
+# Getting Acquainted with Rthreads (5 minutes)
+
+Create two terminal windows, and in each of them start R and load 
+**Rthreads**. Then go through the sequence below, where a blank entry
+means to not type anything in that window in that step.
+
+| Step | Window 0                                   | Window 1                          |
+|-----:|:-------------------------------------------|:----------------------------------|
+| 1    | rthreadsSetup(2)                           |                                   |
+| 2    | rthreadsJoin()                             | rthreadsJoin()                    |
+| 3    | rthreadsMakeSharedVar('x',1,1,initVal=3)   |                                   |
+| 4    |                                            | rthreadsAttachSharedVar('x')      |
+| 5    | sharedGlobals[['x']]1,1]                       | sharedGlobals[['x']][1,1]     |
+| 6    |                                            | sharedGlobals[['x']][1,1] <- 8    |
+| 7    | sharedGlobals[['x']]1,1]                   | sharedGlobals[['x']][1,1]         |
+| 8    | sharedGlobals$x[1,1] <- 12                 |                                   |
+| 9    | sharedGlobals[['x']]1,1]                   | sharedGlobals[['x']][1,1]         |
+| 10   | myGlobals[['myID']]                        | myGlobals[['myID']]                    |
+
+
+: Get-acquainted run-through
+
+(R environments use R list notation. **myGlobals[['myID']** and
+**myGlobals$myID** are equivalent.)
+
+Here is what happens:
+
+* Step 1: Set up 2 threads (which will be numbered 0 and 1).
+
+* Step 2: Each thread checks in. The first thread has already done so,
+  so just one thread checks in this case. Note that each thread, upon
+checking in, will then wait for the others to check in.
+
+* Step 3: Thread 0 creates a shared variable **x**, initial value 3.
+
+* Step 4: Thread 1 attaches **x**.
+
+* Step 5: We view **x** from each thread, seeing the value 3.
+
+* Step 6: Thread 1 changes the value of **x** to 8.
+
+* Step 7: We confirm that both threads now see the value 8 for **x**.
+
+* Step 8: Thread 0 changes the value of **x** to 12.
+
+* Step 9: We confirm that both threads now see the value 12 for **x**.
+
+* Step 10: We confirm that the thread IDs are 0 and 1. Note that they
+  are not shared.
+
 # Example 1: Sorting many long vectors
 
 We have a number of vectors, each to be sorted.
 
 ``` r
-
 # threads configuration: run
 # rthreadsSetup(nThreads=2,
 #    sharedVars=list(nextRowNum=c(1,1,3),m=c(10,100000000)))
@@ -124,38 +187,37 @@ setup <- function()  # run in "manager thread"
    nvals <- sample(tmp,10,replace=TRUE)  # 10 vectors to sort
    for (i in 1:10) {
       n <- nvals[i]
-      m[i,1:(n+1)] <- c(n,runif(n))
+      sharedGlobals$m[i,1:(n+1)] <- c(n,runif(n))
    }
 }
 
 doSorts <- function()  # run in all threads, maybe with system.time()
 {
 
-   rowNum <- myID + 1  # my first vector to sort
+   rowNum <- myGlobals$myID+1  # my first vector to sort
 
-   while (rowNum <= nrow(m)) {
+   while (rowNum <= nrow(sharedGlobals$m)) {
       # as illustration of parallel operation, see which threads execute
       # sorts on which rows
       print(rowNum)
-      n <- m[rowNum,1]
-      x <- m[rowNum,2:(n+1)]
-      m[rowNum,2:(n+1)] <- sort(x)
+      n <- sharedGlobals$m[rowNum,1]
+      x <- sharedGlobals$m[rowNum,2:(n+1)]
+      sharedGlobals$m[rowNum,2:(n+1)] <- sort(x)
       rowNum <- rthreadsAtomicInc('nextRowNum')
    }
 
-   rthreadsWaitDone()
+   rthreadsBarrier()
 
 }
-
 ```
 
 To run, say with just 2 threads:
 
-1. Let's refer to the 2 terminal windows as W1 and W2.
+1. Let's refer to the 2 terminal windows as W0 and W1.
 
 2. Start **Rthreads**: 
 
-   In W1, run
+   In W0, run
 
    ``` r
    rthreadsSetup(nThreads=2,
@@ -177,11 +239,11 @@ To run, say with just 2 threads:
 
 6. Set up and run app: 
 
-   In W1, run **setup()** to generate the data.
+   In W0, run **setup()** to generate the data.
 
-   In both W1 and W2, run **doSorts()** to do the sorting.
+   In both W0 and W1, run **doSorts()** to do the sorting.
 
-   Sorted rows are now available in **m**.
+   Sorted rows are now available in **sharedGlobals$m**.
 
 Overview of the code:
 
@@ -193,48 +255,38 @@ Overview of the code:
 
 * The incrementing must be done *atomically*. Remember, **nextRowNum**
   is a shared variable. Say its value is currently 7, and two threads
-  execute the incrementation at about the same time. We'd like one thread
-  to next sort row 7 and the other to sort row 8, with the new value of
-  **nextRowNum** now being 9. But if there is no constraint on
+  execute the incrementation at about the same time. We'd like one
+  thread to next sort row 7 and the other to sort row 8, with the new
+  value of **nextRowNum** now being 9. But if there is no constraint on
   simultaneous access, both threads may get the value 7, with
-  **nextRowNum** now being 8. Use of **rthreadsAtomicInc** ensures that
-  only one thread can access **nextRowNum** at a time.
+  **nextRowNum** now being 8 (called a *race condition*). Use of
+  **rthreadsAtomicInc** ensures that only one thread can access
+  **nextRowNum** at a time.
 
 * Here is the internal code for **rthreadsAtomicInc**:
 
   ``` r
-  function(sharedV,mtx='mutex0',increm=1) 
-  {
-     mtx <- get(mtx)
-     lock(mtx)
-     shrdv <- get(sharedV)
-     oldVal <- shrdv[1,1]
+  rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
+  {  
+     mtx <- get(mtx,envir=sharedGlobals)
+     synchronicity::lock(mtx)
+     shrdv <- get(sharedV,env=sharedGlobals)
+     oldVal <- shrdv[1,]
      newVal <- oldVal + increm
      shrdv[1,1] <- newVal
-     unlock(mtx)
+     synchronicity::unlock(mtx)
      return(oldVal)
-  }
+  }  
   ```
   
   The key here is use of a *mutex* (short for "mutual exclusion"), which
   can be locked and unlocked. While locked, no other thread is allowed to
-  enter the given section of code. If one thread has locked the mutex and
-  another thread reaches the **lock** line, it will be blocked until the
-  mutex is unlocked. Mutexes come from the **synchronicity** package.
+  enter the given section of code, i.e. the lines beteween the lock and
+  unlock operations.  (Termed a *critical section* in the parallel
+  processing field.)
 
-  The internal code for **rthreadsWaitDone** is similar:
-
-  ``` r
-  function() 
-  {
-     rthreadsAtomicInc('nDone')
-     while (nDone[1,1] < info$nThreads) {}
-  }
-  ```
-
-  Again, the **nDone** count must be incremented atomically. In a
-  scenario of simultaneous accesss like that above, the threads would wait
-  forever (a common bug in parallel computation).
+  If one thread has locked the mutex and another thread reaches the
+  lock line, it will be blocked until the mutex is unlocked. 
 
 * As noted earlier, in threads programming, the threads assign work to
   themselves, instead of manager code doing so. Here this is done via
@@ -258,7 +310,9 @@ We treat the case of *directed* graphs, meaning that a link from vertex
 i to vertex j does not imply that a link exists in the opposite
 direction.  For a graph of v vertices, the *adjacency matrix* M of the
 graph is of size v X v, with the row i, column j element being 1 or 0,
-depending on whether there is a link from i to j.
+depending on whether there is a link from i to j. We also assume the
+matrix is a *directed acylic graph* (DAG), meaning that any path leading
+out of vertex i cannot return to i.
 
 Here is the code:
 
@@ -267,7 +321,7 @@ Here is the code:
 #    rthreadsSetup(nThreads=2)
 
 # algorithm assumes a Directed Acyclic Graph (DAG); for test cases, an
-# easy way is to run a causal discovery method
+# easy 
 
 setup <- function(preDAG,destVertex)  # run in "manager thread"
 {
@@ -292,55 +346,56 @@ setup <- function(preDAG,destVertex)  # run in "manager thread"
 findMinDists <- function()  
    # run in all threads, maybe with system.time()
 {
-   if (myID > 0) {
+   if (myGlobals$myID > 0) {
       rthreadsAttachSharedVar('adjm')
       rthreadsAttachSharedVar('adjmPow')
       rthreadsAttachSharedVar('done')
       rthreadsAttachSharedVar('NDone')
       rthreadsAttachSharedVar('dstVrtx')
    } 
-
-   destVertex <- dstVrtx[1,1]
-
-   n <- nrow(adjm[,])
-   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
-   mySubmatrix <- adjm[myRows,]
+   destVertex <- sharedGlobals$dstVrtx[1,1]
+   n <- nrow(sharedGlobals$adjm[,])
+   myRows <- 
+      parallel::splitIndices(n,myGlobals$info$nThreads)[[myGlobals$myID+1]]
+   mySubmatrix <- sharedGlobals$adjm[myRows,]
 
    # find "dead ends," vertices to lead nowhere
-   tmp <- rowSums(adjm[,])
+   tmp <- rowSums(sharedGlobals$adjm[,])
    deadEnds <- which(tmp == 0)
-   done[deadEnds,1] <- 1
-   done[deadEnds,2] <- 2
+   sharedGlobals$done[deadEnds,1] <- 1
+   sharedGlobals$done[deadEnds,2] <- 2
    # and don't need a path from destVertex to itself
-   done[destVertex,] <- c(1,2)
+   sharedGlobals$done[destVertex,] <- c(1,2)
    deadEndsPlusDV <- c(deadEnds,destVertex)
 
    imDone <- FALSE
    for (iter in 1:(n-1)) {
       rthreadsBarrier()
-      if (NDone[1,1] == info$nThreads) return()
+      if (sharedGlobals$NDone[1,1] == myGlobals$info$nThreads) return()
       if (iter > 1 && (iter <= n-1))
-         adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+         sharedGlobals$adjmPow[myRows,] <- 
+            sharedGlobals$adjmPow[myRows,] %*% sharedGlobals$adjm[,]
       if (!imDone) {
          for (myRow in setdiff(myRows,deadEndsPlusDV)) {
-            if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
-               if (adjmPow[myRow,destVertex] > 0) {
-                  done[myRow,1] <- iter
-                  done[myRow,2] <- 1
+            if (sharedGlobals$done[myRow,1] == 0) {  
+               # this vertex myRow not decided yet
+               if (sharedGlobals$adjmPow[myRow,destVertex] > 0) {
+                  sharedGlobals$done[myRow,1] <- iter
+                  sharedGlobals$done[myRow,2] <- 1
                } else {
-                  currDests <- which(adjmPow[myRow,] > 0)
+                  currDests <- which(sharedGlobals$adjmPow[myRow,] > 0)
                   # check subset
                   currDestsEmpty <- (length(currDests) == 0)
                   if (currDestsEmpty ||
                       !currDestsEmpty &&
                          identical(intersect(currDests,deadEnds),currDests))  {
-                     done[myRow,1] <- iter
-                     done[myRow,2] <- 2
+                     sharedGlobals$done[myRow,1] <- iter
+                     sharedGlobals$done[myRow,2] <- 2
                   }
                }
             }
          }
-         if (sum(done[myRows,1] == 0) == 0) {
+         if (sum(sharedGlobals$done[myRows,1] == 0) == 0) {
             imDone <- TRUE
             rthreadsAtomicInc('NDone')
          }
@@ -348,39 +403,41 @@ findMinDists <- function()
    }
 
 }
-
 ```
 
 As a test run, do
 
 ``` r
 data(svcensus)
-setup(svcensus,3)
+setup(svcensus,4)
 ```
 
 in the first window.  This generates a DAG for our test, and specifies
-that we are interested in vertex 3 as the destination, i.e. "B.".  Then
+that we are interested in vertex 4 as the destination, i.e. "B.".  Then
 run
 
 ``` r
 findMinDists()
 ```
 
-in all windows. Inspect **done[,]** to check the results; see
+in all windows. Inspect **sharedGlobals$done[,]** to check the results; see
 description of that matrix below.
 
 A key property is that the k-th power of M tells us whether there is a
 k-link path from i to j, according to whether the row i, column j
-element is nonzero. The matrix powers are computed in parallel, with
-each thread being responsible for a subset of rows:
+element in the power is nonzero. The matrix powers are computed in
+parallel, with each thread being responsible for a subset of rows:
 
 ``` r
-n <- nrow(adjm[,])
-myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
-mySubmatrix <- adjm[myRows,]
-...
-adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
+n <- nrow(sharedGlobals$adjm[,])
+myRows <- 
+   parallel::splitIndices(n,myGlobals$info$nThreads)[[myGlobals$myID+1]]
+mySubmatrix <- sharedGlobals$adjm[myRows,]
 ```
+
+If say the matrix has 100 rows and we have 2 threads, the first thread
+will assign itself rows 1 to 50, and the second will handle rows 51 to
+100.
 
 Here we have used the fact that in a matrix product W = UV, row i of W
 is equal to the product of row i of U with V.
@@ -394,8 +451,7 @@ destination ended. If s = 1, that means the destination
 was reached in a path of r links; if s = 2, it is impossible to get from
 i to the destination.
 
-We assume the graph is *acyclic*, meaning that once we leave a vertex i,
-there is no path back to that vertex. Thus any path can be of length at
+Since we assume the graph is *acyclic*, any path can be of length at
 most **n-1** links, and typically will be shorter. Not only might a path reach
 the destination with fewer links, but also a path might end at an
 *absorbing vertex*, one with no outgoing links. We refer to them as
@@ -405,36 +461,24 @@ Taking all this into account, we see that even though our **for**
 loop has a nominal number of iterations **n-1**, we often will exit the
 loop well before that.
 
-Again as noted earlier, each thread assigns itself a chunk of the work. That's
-done here:
-
-``` r
-   n <- nrow(adjm[,])
-   myRows <- parallel::splitIndices(n,info$nThreads)[[myID+1]]
-   mySubmatrix <- adjm[myRows,]
-```
-
-If say the matrix has 100 rows and we have 2 threads, the first thread
-will assign itself rows 1 to 50, and the second will handle rows 51 to
-100.
-
 Here is where the main work is done:
 
 ``` r
 for (myRow in setdiff(myRows,deadEndsPlusDV)) {
-   if (done[myRow,1] == 0) {  # this vertex myRow not decided yet
-      if (adjmPow[myRow,destVertex] > 0) {
-         done[myRow,1] <- iter
-         done[myRow,2] <- 1
+   if (sharedGlobals$done[myRow,1] == 0) {  
+      # this vertex myRow not decided yet
+      if (sharedGlobals$adjmPow[myRow,destVertex] > 0) {
+         sharedGlobals$done[myRow,1] <- iter
+         sharedGlobals$done[myRow,2] <- 1
       } else {
-         currDests <- which(adjmPow[myRow,] > 0)
+         currDests <- which(sharedGlobals$adjmPow[myRow,] > 0)
          # check subset
          currDestsEmpty <- (length(currDests) == 0)
          if (currDestsEmpty ||
              !currDestsEmpty &&
                 identical(intersect(currDests,deadEnds),currDests))  {
-            done[myRow,1] <- iter
-            done[myRow,2] <- 2
+            sharedGlobals$done[myRow,1] <- iter
+            sharedGlobals$done[myRow,2] <- 2
          }
       }
    }
@@ -449,54 +493,9 @@ destination, we update **done** accordingly.
 
 The "else" part looks at the nonzero elements of the power matrix in the
 current iteration. These tell us all the vertices at which we could be
-after hopping this nummber of links. The question is then, are all such
+after hopping this number of links. The question is then, are all such
 vertices dead ends? If so, we've found that it is impossible to reach
 the destination from vertex **myRow**, and we update **done** accordingly.
-
-Now, let's take a closer look at the beginning of the loop:
-
-``` r
-for (iter in 1:(n-1)) {
-   rthreadsBarrier()
-   if (NDone[1,1] == info$nThreads) return()
-   if (iter > 1 && (iter <= n-1))
-      adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
-```
-
-The *barrier* is an important threads concept. When a thread reaches
-that line, it may not proceed further until *all* threads have reached
-the line. Why is this needed here? Actually, we don't need it in this
-particular case, but I've included it to explain the barrier concept, as
-follows.
-
-The concern is that we might have, say, thread 3 starting iteration 10,
-but thread 2 is still in iteration 9. When thread 3 modifies the shared
-power matrix,
-
-``` r
-adjmPow[myRows,] <- adjmPow[myRows,] %*% adjm[,]
-```
-
-thread 2 may still be using the old version. If thread 3 modifies the
-matrix before thread 2 finishes using the old version, then this thread
-will likely compute incorrectly.
-
-That actually can't happen here, as each thread works only with its own
-rows of the matrix, not just in the matrix multiplication process, but
-also in the path computations, e.g.
-
-``` r
-if (adjmPow[myRow,destVertex] > 0) {
-   done[myRow,1] <- iter
-   done[myRow,2] <- 1
-```
-
-But suppose instead of the threads pre-assigning groups of rows to
-themselves, they would use a scheme similar to Example 1's use of
-**nextRowNum**. When all threads are done with a given iteration,
-we would need to reset that variable to 1. But we would need to
-ascertain that all threads are indeed done with that iteration, and a
-barrier would accomplish that goal.
 
 # Example 3: Missing value imputation
 
@@ -519,8 +518,15 @@ given round do we update the actual dataset.
 Since we are working column by column, this means earlier imputations
 can be employed in the regression actions of later columns, hopefully
 improving imputation accuracy. (Again, this may or may not be the case,
-but that is the motivation behind the imputation algorithm.) See
+but that is the motivation behind this imputation algorithm.) See
 comments in the code for further discussion.
+
+The purpose of this example is mainly to illustrate the concept of a
+*barrier*, an important threads concept. When a thread reaches that
+line, it may not proceed further until *all* threads have reached the
+line. Why is this needed here? Actually, we don't need it in this
+particular case, but I've included it to explain the barrier concept, as
+follows.
 
 Here is the code:
 
@@ -553,27 +559,28 @@ setup <- function()  # run in "manager thread"
 
 doImputation <- function()  
 {
-   if (myID > 0) {
+   if (myGlobals$myID > 0) {
       rthreadsAttachSharedVar('dta')
    }
-   nc <- ncol(dta)
-   nThreads <- info$nThreads
+   nc <- ncol(sharedGlobals$dta)
+   nThreads <- myGlobals$info$nThreads
 
    # in each round, each thread works on one column; they then update
    # the data
-   nRounds <- ceiling(nc/nThreads)
+   nRounds <- ceiling(nc/myGlobals$info$nThreads)
    numPerRound <- floor(nc/nRounds)
    for (i in 1:nRounds) {
 
-      myColNum <- (i-1)*numPerRound + myID + 1
+      myColNum <- (i-1)*numPerRound + myGlobals$myID + 1
    
       # impute this column, if needed
       myImputes <- NULL
       if (myColNum <= nc) {
          print(myColNum)
-         NAelements <- which(is.na(dta[,myColNum]))
+         NAelements <- which(is.na(sharedGlobals$dta[,myColNum]))
          if (length(NAelements) > 0) {
-            lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
+            lmOut <- 
+               lm(sharedGlobals$dta[,myColNum] ~ sharedGlobals$dta[,-myColNum])
             # note: if a row has more than 1 NA, imputed value 
             # will still be NA
             imputes <- lmOut$fitted.values[NAelements]
@@ -589,7 +596,7 @@ doImputation <- function()
          colNum <- myImputes$colNum
          NAelements <- myImputes$NAelements
          imputes <- myImputes$imputes
-         dta[NAelements,colNum] <- imputes
+         sharedGlobals$dta[NAelements,colNum] <- imputes
       }
 
       rthreadsBarrier()  # some threads may still be writing to dta
@@ -597,20 +604,22 @@ doImputation <- function()
    }
 
 }
-
 ```
 
 To run the code, first run **setup** in one window, then **doImputation**
-in all windows. The shared object **dta** contains the dataset
+in all windows. The shared object **sharedGlobals$dta** contains the dataset
 throughout the code, and upon completion the
 imputed dataset will there.
 
 Work is done on groups of columns, called "rounds" here.
 
 ``` r
-nc <- ncol(dta)
-...
-nRounds <- ceiling(nc/nThreads)
+nc <- ncol(sharedGlobals$dta)
+nThreads <- myGlobals$info$nThreads
+
+# in each round, each thread works on one column; they then update
+# the data
+nRounds <- ceiling(nc/myGlobals$info$nThreads)
 numPerRound <- floor(nc/nRounds)
 for (i in 1:nRounds) {
 ```
@@ -621,10 +630,13 @@ performs the imputation (if any) in **myImputes**:
 ``` r
 myImputes <- NULL
 if (myColNum <= nc) {
-   ...
-   NAelements <- which(is.na(dta[,myColNum]))
+   print(myColNum)
+   NAelements <- which(is.na(sharedGlobals$dta[,myColNum]))
    if (length(NAelements) > 0) {
-      lmOut <- lm(dta[,myColNum] ~ dta[,-myColNum])
+      lmOut <- 
+         lm(sharedGlobals$dta[,myColNum] ~ sharedGlobals$dta[,-myColNum])
+      # note: if a row has more than 1 NA, imputed value 
+      # will still be NA
       imputes <- lmOut$fitted.values[NAelements]
       myImputes <- 
          list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
@@ -639,18 +651,17 @@ to the dataset while another thread is still using the old version of the
 dataset. This is accomplished by the barrier operation:
 
 ``` r
-      ...
-      imputes <- lmOut$fitted.values[NAelements]
       myImputes <- 
          list(colNum=myColNum,imputes=imputes,NAelements=NAelements)
    }
 }
 
-rthreadsBarrier()  
+# update data, where needed
+rthreadsBarrier()  # can't change dta while possbily still in use
 ```
 
 Similarly, after performing the update and going on to the next round,
-we must make sure all threads are done with their update operations,
+we must first make sure all threads are done with their update operations,
 thus another barrier:
 
 ``` r
@@ -658,7 +669,7 @@ if (!is.null(myImputes)) {
    colNum <- myImputes$colNum
    NAelements <- myImputes$NAelements
    imputes <- myImputes$imputes
-   dta[NAelements,colNum] <- imputes
+   sharedGlobals$dta[NAelements,colNum] <- imputes
 }
 
 rthreadsBarrier()  
@@ -681,11 +692,11 @@ used.  The popular Unix (Mac or Linux) **screen** and **tmux** utilities
 can be very helpful in this regard. Basically, they allow multiple
 terminal windows to share the same screen space.
 
-Methods for automating the process of setting up the windows, running
-e.g. **rthreadsJoin** in each one would be desirable.  The above
-utilities can accomplish this by enabling us to have code running in one
-window write a specified string to another window. E.g. say we are in
-the shell of Window A. We can do, e.g. 
+Methods for automating the process of setting up the windows,
+automatically running e.g. **rthreadsJoin** in each one, would be
+desirable.  The above utilities can accomplish this by enabling us to
+have code running in one window write a specified string to another
+window. E.g. say we are in the shell of Window A. We can do, e.g. 
 
 ``` bash
 screen -S WindowBScreen
