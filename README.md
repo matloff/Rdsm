@@ -172,6 +172,8 @@ checking in, will then wait for the others to check in.
 
 # Example 1: Sorting many long vectors
 
+(Note: The code for all of the examples here are in **inst/examples**.)
+
 We have a number of vectors, each to be sorted.
 
 ``` r
