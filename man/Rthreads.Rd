@@ -57,7 +57,7 @@ Shared variables must be of matrix type (a restriction of
 in one window (optionally in \code{rthreadsSetup}), then calls
 \code{rthreadsAttachSharedVar} in the other windows to share them.
 
-See vignette for more details.
+Type 'quickstart' for detailed examples.
 
 }
 
