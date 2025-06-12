@@ -11,7 +11,5 @@ Description: Provides a threads-type parallel programming environment for R.
 OS_type: unix
 Depends: R (>= 3.5.0)
 Imports: bigmemory (>= 4.0.0), synchronicity, parallel
-Suggests: knitr,rmarkdown
 LazyLoad: no
-VignetteBuilder: knitr
 License: GPL (>= 2)
