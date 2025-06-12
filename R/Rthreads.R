@@ -71,6 +71,7 @@ rthreadsJoin <- function(infoDir= '~')
 {
 
    # check in and get my ID
+   info <- NULL  # so CRAN won't object
    infoFile = paste0(infoDir,'/rthreadsInfo.RData')
    load(infoFile)
    tmp <- get0('myGlobals',envir = .GlobalEnv)
@@ -174,7 +175,7 @@ rthreadsAttachMutex <- function(mutexName,infoDir='~/')
 rthreadsWaitDone <- function() 
 {
    rthreadsAtomicInc('nDone')
-   while (nDone[1,1] < myGlobals$info$nThreads) {}
+   while (sharedGlobals$nDone[1,1] < myGlobals$info$nThreads) {}
 }
 
 rthreadsBarrier <- function() 
