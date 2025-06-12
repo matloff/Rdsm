@@ -115,7 +115,7 @@ rthreadsAtomicInc <- function(sharedV,mtx='mutex0',increm=1)
 {
    mtx <- get(mtx,envir=sharedGlobals)
    synchronicity::lock(mtx)
-   shrdv <- get(sharedV,env=sharedGlobals)
+   shrdv <- get(sharedV,envir=sharedGlobals)
    oldVal <- shrdv[1,]
    newVal <- oldVal + increm
    shrdv[1,1] <- newVal
@@ -179,8 +179,8 @@ rthreadsWaitDone <- function()
 
 rthreadsBarrier <- function() 
 {
-   mtx <- get('barrMutex0',env=sharedGlobals)
-   barr <- get('barrier0',env=sharedGlobals)
+   mtx <- get('barrMutex0',envir=sharedGlobals)
+   barr <- get('barrier0',envir=sharedGlobals)
    synchronicity::lock(mtx)
    count <- barr[1,1] - 1
    barr[1,1] <- count
