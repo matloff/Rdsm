@@ -10,6 +10,7 @@
 \alias{rthreadsBarrier}
 \alias{rthreadsJoin}
 \alias{rthreadsMakeMutex}
+\alias{quickstart}
 
 \title{Rthreads}
 
@@ -30,6 +31,7 @@ rthreadsAttachMutex(mutexName,infoDir='~/')
 rthreadsBarrier()
 rthreadsJoin(infoDir= '~')
 rthreadsMakeMutex(mutexName,infoDir='~/')
+quickstart()
 }
 
 \arguments{
