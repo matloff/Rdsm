@@ -7,7 +7,7 @@ Authors@R: person(given = "Norm",
                        email = "nsmatloff@ucdavis.edu")
 Maintainer: Norm Matloff <nsmatloff@ucdavis.edu>
 Date: 2025-05-29
-Title: Parallel Threads Environment for R
+Title: Parallel Threads Environment 
 Description: Provides a threads-type parallel programming environment for R.
    The package gives the R programmer the clearer, more concise
    shared memory world view, and typically gives superior

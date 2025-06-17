@@ -51,6 +51,11 @@ quickstart()
 
 \details{
 
+Threaded programming is inherently based on the concept of sharing
+information via global variables. In this package, the globals are
+stored in the R environments \code{sharedGlobals} and
+\code{myGlobals}.
+
 One sets up terminal windows, one for each thread. In the first window,
 one calls \code{rthreadsSetup}, then \code{rthreadsJoin} in each window.
 
@@ -60,6 +65,14 @@ in one window (optionally in \code{rthreadsSetup}), then calls
 \code{rthreadsAttachSharedVar} in the other windows to share them.
 
 Type 'quickstart()' for detailed examples.
+
+}
+
+\value{
+
+Almost all functions have no return value, operating via side effects to
+the global variables.. The exception is \code{rthreadsAtomic}, which
+returns the old value of the incremented variable.
 
 }
 
